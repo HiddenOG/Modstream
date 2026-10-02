@@ -1,0 +1,99 @@
+{% from "_macros.html" import icon %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{% endblock %}{% if self.title() %} · {% endif %}CyberShield</title>
+  <meta name="description" content="{% block description %}CyberShield detects cyberbullying, hate speech and violent extremism in real time with a hybrid rules + transformer pipeline.{% endblock %}">
+  <meta name="theme-color" content="#4f46e5">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234f46e5' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z'/%3E%3Cpath d='m9 12 2 2 4-4'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400..700&family=JetBrains+Mono:wght@400;600&display=swap">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  <script>
+    // Apply saved theme before first paint to avoid a flash.
+    try { const t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = t; } catch {}
+  </script>
+</head>
+<body>
+  {% include "_icons.html" %}
+
+  {% set nav = [
+    ("pages.analyze", "Analyze", "scan"),
+    ("pages.feed", "Feed", "feed"),
+    ("pages.monitor", "Monitor", "activity"),
+    ("pages.chat", "Chat guard", "chat"),
+    ("pages.resources", "Get help", "lifebuoy"),
+    ("pages.about", "How it works", "info"),
+  ] %}
+
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="{{ url_for('pages.home') }}">
+        <span class="brand-mark">{{ icon("shield") }}</span>
+        CyberShield
+      </a>
+      <nav class="nav" id="site-nav" aria-label="Main">
+        {% for endpoint, label, ic in nav %}
+        <a href="{{ url_for(endpoint) }}" {% if request.endpoint == endpoint %}aria-current="page"{% endif %}>{{ icon(ic) }}{{ label }}</a>
+        {% endfor %}
+      </nav>
+      <div class="header-actions">
+        <button class="btn btn-ghost btn-icon" type="button" data-theme-toggle aria-label="Toggle colour theme">
+          {{ icon("moon", "theme-dark-icon") }}
+        </button>
+        <button class="btn btn-ghost btn-icon nav-toggle" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Open menu" data-nav-toggle>
+          {{ icon("menu") }}
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="container" style="padding-top: 20px">
+      <div class="stack" style="--gap: 8px">
+        {% for category, message in messages %}
+        <div class="flash flash-{{ category if category in ('error', 'warning') else 'info' }}" role="status">{{ icon("alert" if category in ('error', 'warning') else "info") }}<span>{{ message }}</span></div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <span>CyberShield v{{ app_version }} · engine <span class="mono">{{ engine }}</span></span>
+      <span class="row" style="--gap: 18px">
+        <a href="{{ url_for('pages.about') }}#api">API</a>
+        <a href="{{ url_for('api.health') }}">Status</a>
+        <a href="{{ url_for('pages.resources') }}">Safety resources</a>
+      </span>
+    </div>
+  </footer>
+
+  <dialog class="nudge" id="nudge">
+    <form method="dialog">
+      <div class="nudge-body">
+        <div class="nudge-icon" data-nudge-icon>{{ icon("alert") }}</div>
+        <h3 data-nudge-title>Are you sure you want to send this?</h3>
+        <p data-nudge-text>Our safety check found language that others may find hurtful.</p>
+        <div class="quote" data-nudge-quote></div>
+      </div>
+      <div class="nudge-actions">
+        <button class="btn btn-primary" value="edit" autofocus>Edit message</button>
+        <button class="btn btn-ghost" value="send">Send anyway</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module" src="{{ url_for('static', filename='js/core.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

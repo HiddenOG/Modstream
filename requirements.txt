@@ -1,10 +1,5 @@
-flask
-werkzeug
-detoxify
-transformers
-torch
-gunicorn
-
-
-
-
+# Production: web app + ML model
+flask>=3.0
+gunicorn>=22.0
+detoxify>=0.5.2
+torch>=2.2

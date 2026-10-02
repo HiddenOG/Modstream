@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}{{ error.code }}{% endblock %}
+{% block content %}
+<div class="container container-narrow">
+  <div class="empty section" style="min-height: 50vh">
+    {{ icon("shield") }}
+    <h1 style="color: var(--text)">{{ error.code }}</h1>
+    <p>{{ "That file is too large (max 5 MB)." if error.code == 413 else "We couldn't find that page." }}</p>
+    <a class="btn btn-primary" href="{{ url_for('pages.home') }}">Back home</a>
+  </div>
+</div>
+{% endblock %}

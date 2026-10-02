@@ -1,0 +1,16 @@
+{% macro icon(name, cls="") -%}
+<svg class="icon {{ cls }}" aria-hidden="true"><use href="#i-{{ name }}"/></svg>
+{%- endmacro %}
+
+{% macro verdict_badge(verdict) -%}
+{% set label = {"safe": "Safe", "review": "Needs review", "flagged": "Flagged"}[verdict] %}
+<span class="badge badge-{{ verdict }}">{{ icon("check" if verdict == "safe" else "alert") }}{{ label }}</span>
+{%- endmacro %}
+
+{% macro avatar(name, cls="") -%}
+<span class="avatar {{ cls }}" style="--hue: {{ name | hue }}" aria-hidden="true">{{ name[:1] | upper }}</span>
+{%- endmacro %}
+
+{% macro ago(iso) -%}
+<time datetime="{{ iso }}" data-ago>{{ iso[:16] | replace("T", " ") }}</time>
+{%- endmacro %}

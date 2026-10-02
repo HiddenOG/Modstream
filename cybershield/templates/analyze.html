@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Analyzer{% endblock %}
+{% block content %}
+<div class="container">
+  <header class="page-head">
+    <span class="eyebrow">Analyzer</span>
+    <h1 style="margin-top: 8px">Check any text for harm</h1>
+    <p>Paste a comment, DM or post. You get a verdict, a risk score, the exact phrases that triggered it and the model's per-category scores. Nothing you paste here is stored.</p>
+  </header>
+
+  <div class="workbench section-sm">
+    <div class="card card-pad">
+      <form data-analyze>
+        <label class="label" for="text">Text to analyze</label>
+        <textarea class="textarea" id="text" rows="9" maxlength="5000" placeholder="Paste or type a comment here…" required></textarea>
+        <div class="composer-foot">
+          <span class="muted small"><span data-count>0</span> / 5000 · <kbd>Ctrl</kbd> + <kbd>Enter</kbd></span>
+          <div class="row" style="--gap: 8px">
+            <button class="btn btn-ghost" type="reset">Clear</button>
+            <button class="btn btn-primary" type="submit">{{ icon("scan") }}Analyze</button>
+          </div>
+        </div>
+      </form>
+      <div class="examples">
+        <span class="muted small" style="width: 100%">Try an example:</span>
+        <button class="chip" type="button" data-example="Great game today, proud of the whole team!">Friendly</button>
+        <button class="chip" type="button" data-example="you're such an 1d10t, nobody likes you. just go die">Bullying (obfuscated)</button>
+        <button class="chip" type="button" data-example="That exam was stupid hard, I nearly had a heart attack">Ambiguous</button>
+        <button class="chip" type="button" data-example="The news covered the Boko Haram kidnapping in the north today.">News context</button>
+        <button class="chip" type="button" data-example="I will kill you if you show up tomorrow">Threat</button>
+      </div>
+    </div>
+
+    <div class="card card-pad" aria-live="polite" data-output>
+      <div class="empty">
+        {{ icon("shield") }}
+        <div><strong style="color: var(--text)">No analysis yet</strong><br><span class="small">Results show up here.</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script type="module">
+  import { analyze, renderResult, h } from "{{ url_for('static', filename='js/core.js') }}";
+
+  const form = document.querySelector("[data-analyze]");
+  const field = form.querySelector("textarea");
+  const out = document.querySelector("[data-output]");
+  const count = document.querySelector("[data-count]");
+  const initial = out.innerHTML;
+
+  const updateCount = () => { count.textContent = field.value.length; };
+  field.addEventListener("input", updateCount);
+  field.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) form.requestSubmit(); });
+  form.addEventListener("reset", () => { out.innerHTML = initial; setTimeout(updateCount); });
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const text = field.value.trim();
+    if (!text) return;
+    const btn = form.querySelector("[type=submit]");
+    btn.classList.add("is-loading");
+    try {
+      out.replaceChildren(renderResult(await analyze(text, "analyze"), text));
+      if (matchMedia("(max-width: 959px)").matches) out.scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (err) {
+      out.replaceChildren(h("div", { class: "flash flash-error" }, err.message));
+    } finally {
+      btn.classList.remove("is-loading");
+    }
+  });
+
+  document.querySelectorAll("[data-example]").forEach((chip) => chip.addEventListener("click", () => {
+    field.value = chip.dataset.example;
+    updateCount();
+    form.requestSubmit();
+  }));
+</script>
+{% endblock %}
