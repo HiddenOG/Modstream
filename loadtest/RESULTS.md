@@ -63,15 +63,30 @@ would have broken sessions behind a load balancer.
 
 ## With the ML model
 
-With Detoxify (BERT) enabled, model inference becomes the bottleneck, not the
-serving layer. That's what the architecture is built around:
+Measured with Detoxify `unbiased` (RoBERTa) on CPU, one server process, WebSocket `analyze`
+frames. Every message carries a random tag so the server's result cache can't hide the model's
+cost; real chat messages are almost all unique.
 
-- the **micro-batcher** turns many concurrent requests into one forward pass,
-- the **worker pool** scales independently of API nodes (add replicas, or GPUs),
-- the next roadmap phase (ONNX Runtime + int8 quantization) targets per-batch
-  inference cost directly.
+| Streams | Offered | Handled | Errors | p50 | p99 | Avg batch |
+|---:|---:|---:|---:|---:|---:|---:|
+| 50 | 50 msg/s | 43 msg/s | 0 | 2.7 s | 4.0 s | 18 |
+| 100 | 100 msg/s | 45 msg/s | 0 | 5.6 s | 11.4 s | 29 |
 
-Next measurement to add: per-batch inference latency on CPU vs ONNX vs GPU.
+**One process with the model handles about 45 messages per second**, compared with ~7,500 for
+the rules alone: the transformer costs roughly 150x more per message than everything else
+combined. Micro-batching is doing its job (18–29 messages per forward pass); the queue grows
+because the CPU can't run forward passes any faster. Nothing is dropped.
+
+An earlier run that reused 11 sample sentences reported 99 msg/s at p50 18 ms; that was the
+result cache answering, not the model, and is kept out of these numbers.
+
+What this means:
+
+- With the model on every message, capacity scales with **worker processes** (or a GPU), not
+  API nodes. The architecture already separates them.
+- The next roadmap phase, ONNX Runtime + int8 quantization, targets this cost directly.
+- The rules decide every flag anyway (the model is triage only), so the model could run
+  asynchronously behind the instant rules verdict instead of on the request path.
 
 ## Reproduce
 

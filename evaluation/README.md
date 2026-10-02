@@ -9,7 +9,7 @@ messages (107 harmful, 72 safe) across 12 categories, built to probe specific we
 
 ```bash
 python evaluation/run_eval.py --errors                 # rules only
-python evaluation/run_eval.py --scorer detoxify        # rules + AI model
+python evaluation/run_eval.py --scorer detoxify        # rules vs model vs both, speed and memory
 ```
 
 ## Metrics
@@ -44,6 +44,44 @@ Per category, rules v1 → v2:
 
 Raw outputs: [`results/`](results/).
 
+## Adding the AI model (Detoxify `unbiased`)
+
+Same 179 messages, model scores in [`results/model-unbiased-scores.json`](results/model-unbiased-scores.json):
+
+| How the model is used | Catch rate | Sent to review | False alarms | Review load |
+|---|---:|---:|---:|---:|
+| Rules only (v2) | 74.8% | 80.4% | 5.6% | 18.1% |
+| Model only | 62.6% | 69.2% | **30.6%** | 4.2% |
+| Rules + model, any high score flags | 82.2% | 86.9% | **31.9%** | 15.3% |
+| Rules + model, attack labels only | 81.3% | 84.1% | 13.9% | 18.1% |
+| Rules + model, attack labels + aimed at someone | 77.6% | 84.1% | 9.7% | 22.2% |
+| **Rules + model as triage (shipped)** | **74.8%** | **84.1%** | **5.6%** | 26.4% |
+
+What the per-label scores showed:
+
+- **"toxicity" and "obscene" mostly mean "contains swearing".** "Holy shit, we won!" scores 0.94
+  toxicity but 0.12 insult; "you're such a loser" scores 0.99 on both. Only the insult, threat,
+  identity-attack and severe-toxicity scores separate attacks from swearing, so only those count.
+- **The model reads words, not intent.** "That exam was stupid hard" scores 0.98 insult; "you're
+  going to kill it on stage tonight" scores 0.87 threat. Every policy that let the model flag
+  messages on its own produced these false alarms.
+- **Identity bias remains**, even in the "unbiased" checkpoint: "I'm a proud gay man and I'm tired
+  of hate" scores 0.71 identity attack.
+- **It barely understands insults without bad words.** "No one will ever love you" scores 0.10;
+  "you'll never amount to anything" scores 0.01.
+
+So the shipped policy uses the model for **triage**: it can send a message to human review but
+never flags it alone. That's the only arrangement tested that reaches more harmful content without
+adding a single false alarm. The cost is review load (18% → 26% of safe messages), which an LLM
+review tier is meant to absorb.
+
+| Cost (this laptop, CPU) | Rules | Model |
+|---|---:|---:|
+| Time per message | 0.2 ms | 14–44 ms (batch of 8–64 vs 1) |
+| Throughput per process, unique messages | ~7,500 msg/s | **~45 msg/s** |
+| Memory | negligible | ~800 MB |
+| Load time | instant | ~5–11 s once cached |
+
 ## What changed in rules v2
 
 1. **Targeting.** Insults and profanity aimed at a person ("fuck you", "your mom is a...", "you're so
@@ -64,9 +102,12 @@ Raw outputs: [`results/`](results/).
   sentences, but some stock phrases ("waste of space", "jump off a bridge") appear in both. Treat
   these numbers as optimistic. The categories the rules were not designed for, such as insults with
   no bad words, are the more honest signal.
-- **What rules can't do:** understand meaning. Almost every remaining miss is an insult with no
-  keywords, a self-harm suggestion phrased politely, or hate speech without slurs. That's the AI
-  model's job; it gets measured on this same set next.
+- **What neither layer does well:** understand meaning. Almost every remaining miss is an insult
+  with no keywords, a self-harm suggestion phrased politely, or hate speech without slurs. Rules
+  can't see these and Detoxify scores most of them low; that's the case for an LLM review tier.
+- **Policy choice on the same set.** The model-combination policies were compared on the data they
+  are reported on. They were each defined from a stated principle rather than tuned threshold by
+  threshold, but a held-out set would make the comparison more trustworthy.
 - **Counter-speech:** "If someone tells you to kill yourself, report it" is still flagged. Quoting
   abuse in order to condemn it is a known hard problem.
 - 179 messages is enough to compare versions, not to estimate real-world accuracy precisely.

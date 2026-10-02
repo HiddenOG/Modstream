@@ -4,9 +4,9 @@
 
 **Automatic content moderation for high-volume message streams.** Harassment, hate speech, threats and violent extremism are flagged in milliseconds, with explainable verdicts.
 
-Modstream scores chats, posts and comments with a hybrid pipeline (a curated rule layer plus a BERT toxicity model) and turns the result into product actions: pre-send nudges, content-warning interstitials, a human review queue and a live moderator console. The serving layer is built for **thousands of concurrent streams**: async I/O, dynamic micro-batching, Redis Streams worker pools and per-node fan-out.
+Modstream scores chats, posts and comments with a hybrid pipeline (a curated rule layer plus a RoBERTa toxicity model used for triage) and turns the result into product actions: pre-send nudges, content-warning interstitials, a human review queue and a live moderator console. The serving layer is built for **thousands of concurrent streams**: async I/O, dynamic micro-batching, Redis Streams worker pools and per-node fan-out.
 
-- **7,772 msg/s** across **2,000 concurrent WebSocket streams**, with zero errors and p99 165 ms ([load test results](loadtest/RESULTS.md))
+- **7,772 msg/s** across **2,000 concurrent WebSocket streams** on the rules path, with zero errors and p99 165 ms; about **45 msg/s per process** with the transformer on every message ([load test results](loadtest/RESULTS.md))
 - **At-least-once** stream processing, with idempotent storage, crash recovery and a dead-letter queue
 - **84 tests**, including broker tests against both backends; a CI integration job runs the suite against real Redis 7 and Postgres 16
 
@@ -51,7 +51,7 @@ Modstream scores chats, posts and comments with a hybrid pipeline (a curated rul
 - **At-least-once + idempotency.** Workers acknowledge only after storing and publishing; inserts are keyed on the stream entry id, so redelivery after a crash never duplicates rows ([worker](modstream/worker.py)).
 - **Fan-out without per-viewer cost.** Each API node tails the event log once and fans out to local subscribers through bounded queues. Events are serialized once, not per subscriber. Slow viewers get a `lagged` notice instead of stalling everyone, and can replay the durable log with `Last-Event-ID` ([hub](modstream/hub.py)).
 - **Load shedding.** A full batch queue returns 503 with `Retry-After` instead of letting latency grow without bound.
-- **Explainable, bias-aware detection.** Word-boundary matching with leetspeak normalization that keeps original offsets for highlighting; *contextual* terms only flag when the model agrees; purely religious vocabulary is deliberately excluded ([detector](modstream/detector.py)).
+- **Explainable, bias-aware detection.** Word-boundary matching with leetspeak normalization that keeps original offsets for highlighting; insults and profanity are flagged when aimed at a person, and swearing that isn't is allowed; the model can only send content to review, never flag it alone, because letting it flag raised false alarms from 5.6% to as much as 32% on the evaluation set; purely religious vocabulary is deliberately excluded ([detector](modstream/detector.py)).
 - **Privacy by default.** Analyzer and chat text is never stored; dashboards use counters, not content.
 
 ## Quick start
@@ -108,7 +108,8 @@ All settings are environment variables prefixed with `MODSTREAM_` ([config.py](m
 | `MODSTREAM_REDIS_URL` | unset | Unset = in-memory broker (single process) |
 | `MODSTREAM_DATABASE_URL` | SQLite in `instance/` | e.g. `postgresql+asyncpg://…` |
 | `MODSTREAM_RUN_WORKER` | `true` | Embed a worker in the API process; `false` when workers run separately |
-| `MODSTREAM_SCORER` | `auto` | `auto`, `detoxify` or `none` (rules only) |
+| `MODSTREAM_SCORER` | `auto` | `auto` (use the model if installed, else rules only), `detoxify` or `none` |
+| `MODSTREAM_MODEL_VARIANT` | `unbiased` | Detoxify checkpoint: `unbiased`, `original` or `multilingual` |
 | `MODSTREAM_BATCH_MAX_SIZE` / `MODSTREAM_BATCH_MAX_WAIT_MS` | `32` / `5` | Micro-batching window |
 | `MODSTREAM_FLAG_THRESHOLD` / `MODSTREAM_REVIEW_THRESHOLD` | `0.7` / `0.4` | Verdict policy |
 | `MODSTREAM_SECRET_KEY` | random | **Required** when `MODSTREAM_ENV=prod` (shared across processes) |
@@ -122,6 +123,9 @@ friendly banter ([evaluation/](evaluation/README.md)):
 |---|---:|---:|
 | Rules v1 (word lists) | 28.0% | 5.6% |
 | Rules v2 (targeting + disguise resistance) | 74.8% | 5.6% |
+| Rules v2 + Detoxify as triage | 74.8% (84.1% reach review) | 5.6% |
+
+The model mostly adds review coverage; it doesn't understand insults without bad words either. Details and the policies that were rejected: [evaluation/README.md](evaluation/README.md#adding-the-ai-model-detoxify-unbiased).
 
 ## Testing & load testing
 
