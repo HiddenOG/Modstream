@@ -24,7 +24,8 @@ class Settings(BaseSettings):
     max_upload_bytes: int = 5 * 1024 * 1024
 
     # Detection
-    scorer: Literal["auto", "detoxify", "none"] = "auto"
+    scorer: Literal["auto", "detoxify", "none"] = "auto"  # auto = use the model if installed, else rules only
+    model_variant: Literal["unbiased", "original", "multilingual"] = "unbiased"
     flag_threshold: float = 0.7
     review_threshold: float = 0.4
     warmup: bool = True
