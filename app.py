@@ -1,10 +1,10 @@
-"""Entry point: `python app.py` for development, `gunicorn app:app` in production."""
-
-import os
+"""ASGI entry point: `uvicorn app:app`, or `python app.py` for local development."""
 
 from cybershield import create_app
 
 app = create_app()
 
 if __name__ == "__main__":
-    app.run(debug=os.environ.get("FLASK_DEBUG") == "1", threaded=True)
+    import uvicorn
+
+    uvicorn.run("app:app", host="127.0.0.1", port=8000, reload=False)

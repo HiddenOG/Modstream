@@ -1,5 +1,4 @@
 # Production: web app + ML model
-flask>=3.0
-gunicorn>=22.0
+-r requirements-core.txt
 detoxify>=0.5.2
 torch>=2.2

@@ -1,231 +1,215 @@
-"""SQLite persistence.
-
-Every post/comment write also appends a row to ``events`` (a transactional
-outbox). The live monitor streams that table by id, which makes the stream
-resumable via the SSE ``Last-Event-ID`` header and safe across workers.
-"""
+"""Async persistence with SQLAlchemy 2.0: Postgres in production, SQLite locally."""
 
 from __future__ import annotations
 
-import json
-import sqlite3
-from datetime import datetime, timezone
+import os
+from datetime import UTC, datetime
 
-from flask import current_app, g
+from sqlalchemy import (
+    JSON,
+    BigInteger,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    event,
+    func,
+    select,
+    update,
+)
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS posts (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    author      TEXT NOT NULL,
-    body        TEXT NOT NULL,
-    image       TEXT,
-    likes       INTEGER NOT NULL DEFAULT 0,
-    shares      INTEGER NOT NULL DEFAULT 0,
-    verdict     TEXT NOT NULL,
-    risk        REAL NOT NULL,
-    analysis    TEXT NOT NULL,
-    created_at  TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS comments (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    post_id     INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
-    author      TEXT NOT NULL,
-    body        TEXT NOT NULL,
-    verdict     TEXT NOT NULL,
-    risk        REAL NOT NULL,
-    analysis    TEXT NOT NULL,
-    created_at  TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_comments_post ON comments(post_id);
-
--- Metadata-only log of every analysis. Raw text from the analyzer and chat
--- tools is deliberately NOT stored.
-CREATE TABLE IF NOT EXISTS scans (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    source      TEXT NOT NULL,
-    verdict     TEXT NOT NULL,
-    risk        REAL NOT NULL,
-    categories  TEXT NOT NULL,
-    latency_ms  REAL NOT NULL,
-    created_at  TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS events (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    kind        TEXT NOT NULL,
-    post_id     INTEGER NOT NULL,
-    comment_id  INTEGER,
-    created_at  TEXT NOT NULL
-);
-"""
+# BIGINT ids on Postgres; SQLite only auto-increments a column declared INTEGER.
+Id = BigInteger().with_variant(Integer, "sqlite")
 
 
-def now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+def utcnow() -> datetime:
+    return datetime.now(UTC)
 
 
-def connect(path: str) -> sqlite3.Connection:
-    conn = sqlite3.connect(path, timeout=10)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-    return conn
+class Base(DeclarativeBase):
+    def to_dict(self) -> dict:
+        out = {}
+        for col in self.__table__.columns:
+            value = getattr(self, col.key)
+            out[col.key] = value.isoformat() if isinstance(value, datetime) else value
+        return out
 
 
-def get_db() -> sqlite3.Connection:
-    if "db" not in g:
-        g.db = connect(current_app.config["DATABASE"])
-    return g.db
+class Post(Base):
+    __tablename__ = "posts"
+    id: Mapped[int] = mapped_column(Id, primary_key=True, autoincrement=True)
+    author: Mapped[str] = mapped_column(String(40))
+    body: Mapped[str] = mapped_column(Text)
+    image: Mapped[str | None] = mapped_column(String(64))
+    likes: Mapped[int] = mapped_column(Integer, default=0)
+    shares: Mapped[int] = mapped_column(Integer, default=0)
+    verdict: Mapped[str] = mapped_column(String(10), index=True)
+    risk: Mapped[float] = mapped_column(Float)
+    analysis: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
-def close_db(_exc=None) -> None:
-    conn = g.pop("db", None)
-    if conn is not None:
-        conn.close()
+class Comment(Base):
+    __tablename__ = "comments"
+    id: Mapped[int] = mapped_column(Id, primary_key=True, autoincrement=True)
+    post_id: Mapped[int] = mapped_column(ForeignKey("posts.id", ondelete="CASCADE"), index=True)
+    author: Mapped[str] = mapped_column(String(40))
+    body: Mapped[str] = mapped_column(Text)
+    verdict: Mapped[str] = mapped_column(String(10), index=True)
+    risk: Mapped[float] = mapped_column(Float)
+    analysis: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
-def init_db(path: str) -> None:
-    conn = connect(path)
-    conn.execute("PRAGMA journal_mode = WAL")  # readers don't block the writer
-    conn.executescript(SCHEMA)
-    conn.close()
+class Message(Base):
+    """A message from an external stream, moderated asynchronously by workers."""
 
+    __tablename__ = "messages"
+    id: Mapped[int] = mapped_column(Id, primary_key=True, autoincrement=True)
+    entry_id: Mapped[str] = mapped_column(String(64), unique=True)  # broker id: makes redelivery idempotent
+    channel: Mapped[str] = mapped_column(String(64))
+    author: Mapped[str] = mapped_column(String(40))
+    body: Mapped[str] = mapped_column(Text)
+    verdict: Mapped[str] = mapped_column(String(10))
+    risk: Mapped[float] = mapped_column(Float)
+    analysis: Mapped[dict] = mapped_column(JSON)
+    enqueued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
-# --- Row mappers -------------------------------------------------------------
-
-def _item(row: sqlite3.Row) -> dict:
-    item = dict(row)
-    item["analysis"] = json.loads(item["analysis"])
-    return item
-
-
-def post_dict(row: sqlite3.Row, comments: list[dict] | None = None) -> dict:
-    post = _item(row)
-    post["comments"] = comments or []
-    return post
-
-
-# --- Queries -----------------------------------------------------------------
-
-def insert_post(db, author, body, image, analysis) -> int:
-    cur = db.execute(
-        "INSERT INTO posts (author, body, image, verdict, risk, analysis, created_at)"
-        " VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (author, body, image, analysis.verdict, analysis.risk, json.dumps(analysis.to_dict()), now()),
+    __table_args__ = (
+        Index("ix_messages_channel_id", "channel", "id"),
+        Index("ix_messages_verdict_id", "verdict", "id"),
     )
-    db.execute(
-        "INSERT INTO events (kind, post_id, created_at) VALUES ('post', ?, ?)",
-        (cur.lastrowid, now()),
-    )
-    db.commit()
-    return cur.lastrowid
 
 
-def insert_comment(db, post_id, author, body, analysis) -> int:
-    cur = db.execute(
-        "INSERT INTO comments (post_id, author, body, verdict, risk, analysis, created_at)"
-        " VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (post_id, author, body, analysis.verdict, analysis.risk, json.dumps(analysis.to_dict()), now()),
-    )
-    db.execute(
-        "INSERT INTO events (kind, post_id, comment_id, created_at) VALUES ('comment', ?, ?, ?)",
-        (post_id, cur.lastrowid, now()),
-    )
-    db.commit()
-    return cur.lastrowid
+# --- Engine --------------------------------------------------------------------
+
+def make_engine(url: str) -> AsyncEngine:
+    if url.startswith("sqlite"):
+        path = url.split("///", 1)[-1]
+        if path and path != ":memory:":
+            os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+        engine = create_async_engine(url, connect_args={"timeout": 30})
+
+        @event.listens_for(engine.sync_engine, "connect")
+        def _pragmas(conn, _record):
+            cur = conn.cursor()
+            cur.execute("PRAGMA journal_mode=WAL")
+            cur.execute("PRAGMA synchronous=NORMAL")
+            cur.execute("PRAGMA foreign_keys=ON")
+            cur.close()
+
+        return engine
+    return create_async_engine(url, pool_size=10, max_overflow=20, pool_pre_ping=True)
 
 
-def get_post(db, post_id: int) -> dict | None:
-    row = db.execute("SELECT * FROM posts WHERE id = ?", (post_id,)).fetchone()
-    if row is None:
-        return None
-    comments = db.execute(
-        "SELECT * FROM comments WHERE post_id = ? ORDER BY id", (post_id,)
-    ).fetchall()
-    return post_dict(row, [_item(c) for c in comments])
+def make_sessionmaker(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
+    return async_sessionmaker(engine, expire_on_commit=False)
 
 
-def list_posts(db, limit: int = 50) -> list[dict]:
-    rows = db.execute("SELECT * FROM posts ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
-    if not rows:
-        return []
-    ids = [r["id"] for r in rows]
-    marks = ",".join("?" * len(ids))
-    by_post: dict[int, list] = {i: [] for i in ids}
-    for c in db.execute(
-        f"SELECT * FROM comments WHERE post_id IN ({marks}) ORDER BY id", ids
-    ).fetchall():
-        by_post[c["post_id"]].append(_item(c))
-    return [post_dict(r, by_post[r["id"]]) for r in rows]
+async def create_schema(engine: AsyncEngine) -> None:
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
 
-def react(db, post_id: int, kind: str) -> dict | None:
-    column = {"like": "likes", "share": "shares"}[kind]
-    cur = db.execute(f"UPDATE posts SET {column} = {column} + 1 WHERE id = ?", (post_id,))
-    db.commit()
-    if cur.rowcount == 0:
-        return None
-    row = db.execute("SELECT likes, shares FROM posts WHERE id = ?", (post_id,)).fetchone()
-    return dict(row)
+# --- Posts & comments ---------------------------------------------------------------
 
-
-def record_scan(db, source: str, analysis) -> None:
-    db.execute(
-        "INSERT INTO scans (source, verdict, risk, categories, latency_ms, created_at)"
-        " VALUES (?, ?, ?, ?, ?, ?)",
-        (source, analysis.verdict, analysis.risk, json.dumps(analysis.categories),
-         analysis.latency_ms, now()),
-    )
-    db.commit()
-
-
-def stats(db) -> dict:
-    totals = db.execute(
-        "SELECT COUNT(*) AS scans,"
-        " COALESCE(SUM(verdict = 'flagged'), 0) AS flagged,"
-        " COALESCE(SUM(verdict = 'review'), 0) AS review,"
-        " COALESCE(AVG(latency_ms), 0) AS avg_latency_ms"
-        " FROM scans"
-    ).fetchone()
-    content = db.execute(
-        "SELECT"
-        " (SELECT COUNT(*) FROM posts) AS posts,"
-        " (SELECT COUNT(*) FROM posts WHERE verdict = 'flagged') AS flagged_posts,"
-        " (SELECT COUNT(*) FROM comments) AS comments,"
-        " (SELECT COUNT(*) FROM comments WHERE verdict = 'flagged') AS flagged_comments"
-    ).fetchone()
-    categories: dict[str, int] = {}
-    for (raw,) in db.execute("SELECT categories FROM scans WHERE verdict != 'safe'"):
-        for cat in json.loads(raw):
-            categories[cat] = categories.get(cat, 0) + 1
-    by_source = {
-        r["source"]: r["n"]
-        for r in db.execute("SELECT source, COUNT(*) AS n FROM scans GROUP BY source")
-    }
-    result = dict(totals) | dict(content)
-    result["avg_latency_ms"] = round(result["avg_latency_ms"], 1)
-    result["flag_rate"] = round(result["flagged"] / result["scans"], 4) if result["scans"] else 0
-    result["categories"] = dict(sorted(categories.items(), key=lambda kv: -kv[1]))
-    result["by_source"] = by_source
-    return result
-
-
-def events_since(db, last_id: int, limit: int = 100) -> list[dict]:
-    """Return events after ``last_id`` with their post/comment payloads."""
-    rows = db.execute(
-        "SELECT * FROM events WHERE id > ? ORDER BY id LIMIT ?", (last_id, limit)
-    ).fetchall()
-    out = []
-    for e in rows:
-        if e["kind"] == "post":
-            row = db.execute("SELECT * FROM posts WHERE id = ?", (e["post_id"],)).fetchone()
-            payload = post_dict(row) if row else None
-        else:
-            row = db.execute("SELECT * FROM comments WHERE id = ?", (e["comment_id"],)).fetchone()
-            payload = _item(row) if row else None
-        if payload is not None:
-            out.append({"id": e["id"], "type": e["kind"], "data": payload})
+def _with_comments(post: Post, comments: list[Comment]) -> dict:
+    out = post.to_dict()
+    out["comments"] = [c.to_dict() for c in comments]
     return out
 
 
-def last_event_id(db) -> int:
-    return db.execute("SELECT COALESCE(MAX(id), 0) FROM events").fetchone()[0]
+async def insert_post(s: AsyncSession, author: str, body: str, image: str | None, analysis) -> dict:
+    post = Post(author=author, body=body, image=image, verdict=analysis.verdict,
+                risk=analysis.risk, analysis=analysis.to_dict(), likes=0, shares=0)
+    s.add(post)
+    await s.commit()
+    return _with_comments(post, [])
+
+
+async def get_post(s: AsyncSession, post_id: int) -> dict | None:
+    post = await s.get(Post, post_id)
+    if post is None:
+        return None
+    comments = (await s.scalars(select(Comment).where(Comment.post_id == post_id).order_by(Comment.id))).all()
+    return _with_comments(post, list(comments))
+
+
+async def list_posts(s: AsyncSession, limit: int = 50) -> list[dict]:
+    posts = (await s.scalars(select(Post).order_by(Post.id.desc()).limit(limit))).all()
+    if not posts:
+        return []
+    by_post: dict[int, list] = {p.id: [] for p in posts}
+    comments = await s.scalars(select(Comment).where(Comment.post_id.in_(by_post)).order_by(Comment.id))
+    for c in comments:
+        by_post[c.post_id].append(c)
+    return [_with_comments(p, by_post[p.id]) for p in posts]
+
+
+async def insert_comment(s: AsyncSession, post_id: int, author: str, body: str, analysis) -> dict:
+    comment = Comment(post_id=post_id, author=author, body=body, verdict=analysis.verdict,
+                      risk=analysis.risk, analysis=analysis.to_dict())
+    s.add(comment)
+    await s.commit()
+    return comment.to_dict()
+
+
+async def react(s: AsyncSession, post_id: int, kind: str) -> dict | None:
+    column = {"like": Post.likes, "share": Post.shares}[kind]
+    result = await s.execute(
+        update(Post).where(Post.id == post_id).values({column: column + 1}).returning(Post.likes, Post.shares)
+    )
+    row = result.first()
+    await s.commit()
+    return {"likes": row.likes, "shares": row.shares} if row else None
+
+
+async def content_counts(s: AsyncSession) -> dict:
+    row = (await s.execute(select(
+        select(func.count()).select_from(Post).scalar_subquery().label("posts"),
+        select(func.count()).select_from(Post).where(Post.verdict == "flagged").scalar_subquery()
+        .label("flagged_posts"),
+        select(func.count()).select_from(Comment).scalar_subquery().label("comments"),
+        select(func.count()).select_from(Comment).where(Comment.verdict == "flagged").scalar_subquery()
+        .label("flagged_comments"),
+    ))).one()
+    return dict(row._mapping)
+
+
+# --- Stream messages -----------------------------------------------------------------
+
+def _upsert(s: AsyncSession):
+    if s.bind.dialect.name == "postgresql":
+        from sqlalchemy.dialects.postgresql import insert
+    else:
+        from sqlalchemy.dialects.sqlite import insert
+    return insert
+
+
+async def insert_messages(s: AsyncSession, rows: list[dict]) -> dict[str, int]:
+    """Bulk insert, ignoring entries already stored by an earlier delivery.
+    Returns ``entry_id -> message id`` for every row in the batch."""
+    if not rows:
+        return {}
+    insert = _upsert(s)
+    await s.execute(insert(Message).values(rows).on_conflict_do_nothing(index_elements=["entry_id"]))
+    await s.commit()
+    ids = await s.execute(
+        select(Message.entry_id, Message.id).where(Message.entry_id.in_([r["entry_id"] for r in rows]))
+    )
+    return {entry_id: msg_id for entry_id, msg_id in ids}
+
+
+async def list_messages(s: AsyncSession, channel: str | None, verdict: str | None, limit: int) -> list[dict]:
+    q = select(Message).order_by(Message.id.desc()).limit(limit)
+    if channel:
+        q = q.where(Message.channel == channel)
+    if verdict:
+        q = q.where(Message.verdict == verdict)
+    return [m.to_dict() for m in (await s.scalars(q)).all()]

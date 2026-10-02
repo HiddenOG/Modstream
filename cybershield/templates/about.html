@@ -67,7 +67,7 @@
         </tbody>
       </table></div>
 <pre class="code"><code><span class="tok-c"># Analyze a message</span>
-curl -s {{ request.host_url }}api/v1/analyze \
+curl -s {{ request.base_url }}api/v1/analyze \
   -H <span class="tok-s">"Content-Type: application/json"</span> \
   -d <span class="tok-s">'{"text": "you are such a loser"}'</span></code></pre>
 <p class="muted small">Example response (model scores are illustrative):</p>

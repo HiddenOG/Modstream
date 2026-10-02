@@ -55,7 +55,7 @@
             </div>
             <div class="post-body">{{ post.body }}</div>
             {% if post.image %}
-            <div class="post-media"><img src="{{ url_for('pages.upload', name=post.image) }}" alt="Image attached by {{ post.author }}" loading="lazy"></div>
+            <div class="post-media"><img src="{{ url_for('pages.upload', path=post.image) }}" alt="Image attached by {{ post.author }}" loading="lazy"></div>
             {% endif %}
           </div>
         </div>
