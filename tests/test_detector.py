@@ -86,3 +86,77 @@ def test_lexicon_only_mode():
     assert detector.analyze("hello").verdict == "safe"
     assert detector.analyze("you idiot").verdict == "flagged"
     assert detector.analyze("hello").model_scores is None
+
+
+# --- Targeting, disguises and policy (rules only) -----------------------------------
+
+@pytest.fixture
+def rules():
+    return Detector(NullScorer())
+
+
+@pytest.mark.parametrize("text", ["fuck you", "fuck your mother", "ur mom is a hoe", "you dumb bitch",
+                                  "screw you", "you're so stupid"])
+def test_insults_aimed_at_a_person_are_flagged(rules, text):
+    result = rules.analyze(text)
+    assert result.verdict == "flagged"
+    assert any(m.directed for m in result.matches)
+
+
+@pytest.mark.parametrize("text", ["this traffic is fucking awful", "holy shit, we won!",
+                                  "the hoe is in the garden shed", "what the fuck happened to the wifi"])
+def test_profanity_not_aimed_at_anyone_is_allowed(rules, text):
+    result = rules.analyze(text)
+    assert result.verdict == "safe"
+    assert any("not aimed at anyone" in r for r in result.reasons)
+
+
+@pytest.mark.parametrize("text, shown", [
+    ("f*ck you", "f*ck"), ("f**k you", "f**k"), ("fuuuuck you", "fuuuuck"), ("f u c k you", "f u c k"),
+    ("fuc your mom", "fuc"), ("phuck you", "phuck"), ("b!tch please, you're nothing", "b!tch"),
+])
+def test_disguises_are_caught_and_highlighted_in_the_original_text(rules, text, shown):
+    result = rules.analyze(text)
+    assert result.verdict == "flagged"
+    hit = next(m for m in result.matches if m.term == ("bitch" if "b!tch" in text else "fuck"))
+    assert text[hit.start:hit.end] == shown
+
+
+def test_stacked_insults_are_flagged(rules):
+    assert rules.analyze("$tupid b1tch").verdict == "flagged"
+    assert rules.analyze("ugly cow").verdict == "flagged"
+
+
+def test_self_talk_is_not_bullying(rules):
+    assert rules.analyze("I'm such an idiot, I left my wallet at home").verdict == "review"
+    assert rules.analyze("you idiot").verdict == "flagged"
+
+
+@pytest.mark.parametrize("text", ["i'm going to find you and hurt you", "we're going to bomb your house",
+                                  "say that again and i'll stab you"])
+def test_threat_pattern(rules, text):
+    result = rules.analyze(text)
+    assert result.verdict == "flagged" and "threat" in result.categories
+
+
+def test_threat_pattern_ignores_banter(rules):
+    assert rules.analyze("i'll find you a seat").verdict == "safe"
+
+
+def test_spaced_letters_dont_swallow_normal_text(rules):
+    assert rules.analyze("u r a b c and that's fine").verdict == "safe"
+    assert rules.analyze("k y s").verdict == "flagged"
+
+
+def test_evaluation_set_regression_guard():
+    """Fails if a rule change makes the detector meaningfully worse on the labelled set."""
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "evaluation"))
+    from run_eval import evaluate, load
+
+    dataset = Path(__file__).resolve().parents[1] / "evaluation" / "dataset.jsonl"
+    metrics = evaluate(Detector(NullScorer()), load(dataset))
+    assert metrics["catch_rate"] >= 0.70, metrics["catch_rate"]
+    assert metrics["false_alarm_rate"] <= 0.07, metrics["false_alarm_rate"]

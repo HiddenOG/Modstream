@@ -334,6 +334,7 @@ kbd {
 mark { border-radius: 4px; padding: 0 2px; color: inherit; }
 mark.strong { background: var(--flagged-soft); box-shadow: inset 0 -2px 0 var(--flagged); }
 mark.contextual { background: var(--review-soft); box-shadow: inset 0 -2px 0 var(--review); }
+mark.mild { background: transparent; box-shadow: inset 0 -1px 0 var(--muted); }
 .reasons { margin: 0; padding-left: 18px; font-size: 0.9rem; display: grid; gap: 4px; }
 .score-list { display: grid; gap: 10px; }
 .score-row { display: grid; grid-template-columns: 130px 1fr 48px; gap: 12px; align-items: center; font-size: 0.86rem; }

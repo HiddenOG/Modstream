@@ -35,9 +35,10 @@ class BatchAnalyzeRequest(BaseModel):
 class MatchOut(BaseModel):
     term: str
     category: str
-    tier: Literal["strong", "contextual"]
+    tier: Literal["strong", "contextual", "mild"]
     start: int
     end: int
+    directed: bool = False
 
 
 class AnalysisOut(BaseModel):

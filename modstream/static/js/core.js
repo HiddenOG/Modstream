@@ -80,7 +80,8 @@ export function highlight(text, matches = []) {
   for (const m of matches) {
     if (m.start < cursor) continue;
     frag.append(text.slice(cursor, m.start));
-    frag.append(h("mark", { class: m.tier, title: `${m.category} · ${m.tier}` }, text.slice(m.start, m.end)));
+    const why = m.directed ? "aimed at a person" : m.tier === "mild" ? "not aimed at anyone" : m.tier;
+    frag.append(h("mark", { class: m.tier, title: `${m.category} · ${why}` }, text.slice(m.start, m.end)));
     cursor = m.end;
   }
   frag.append(text.slice(cursor));
