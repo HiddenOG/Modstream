@@ -1,0 +1,548 @@
+{
+  "engine": "lexicon-only",
+  "messages": 179,
+  "harmful": 107,
+  "safe": 72,
+  "catch_rate": 0.7476635514018691,
+  "sent_to_review": 0.8037383177570093,
+  "false_alarm_rate": 0.05555555555555555,
+  "review_load": 0.18055555555555555,
+  "ms_per_message": 0.103,
+  "by_tag": {
+    "direct_insult": {
+      "label": "harmful",
+      "n": 25,
+      "flagged": 23,
+      "review": 1,
+      "safe": 1
+    },
+    "directed_profanity": {
+      "label": "harmful",
+      "n": 15,
+      "flagged": 15,
+      "review": 0,
+      "safe": 0
+    },
+    "obfuscated": {
+      "label": "harmful",
+      "n": 25,
+      "flagged": 24,
+      "review": 0,
+      "safe": 1
+    },
+    "threat": {
+      "label": "harmful",
+      "n": 12,
+      "flagged": 7,
+      "review": 2,
+      "safe": 3
+    },
+    "self_harm": {
+      "label": "harmful",
+      "n": 8,
+      "flagged": 4,
+      "review": 0,
+      "safe": 4
+    },
+    "hate": {
+      "label": "harmful",
+      "n": 12,
+      "flagged": 6,
+      "review": 3,
+      "safe": 3
+    },
+    "no_keywords": {
+      "label": "harmful",
+      "n": 10,
+      "flagged": 1,
+      "review": 0,
+      "safe": 9
+    },
+    "everyday": {
+      "label": "safe",
+      "n": 21,
+      "flagged": 0,
+      "review": 1,
+      "safe": 20
+    },
+    "undirected_profanity": {
+      "label": "safe",
+      "n": 12,
+      "flagged": 0,
+      "review": 0,
+      "safe": 12
+    },
+    "lookalike": {
+      "label": "safe",
+      "n": 15,
+      "flagged": 0,
+      "review": 2,
+      "safe": 13
+    },
+    "news_counterspeech": {
+      "label": "safe",
+      "n": 12,
+      "flagged": 2,
+      "review": 5,
+      "safe": 5
+    },
+    "borderline": {
+      "label": "safe",
+      "n": 12,
+      "flagged": 2,
+      "review": 5,
+      "safe": 5
+    }
+  },
+  "errors": [
+    {
+      "text": "imagine being this dumb",
+      "label": "harmful",
+      "tag": "direct_insult",
+      "verdict": "review",
+      "matched": [
+        "dumb"
+      ],
+      "reasons": [
+        "Matched context-dependent terms: dumb"
+      ]
+    },
+    {
+      "text": "everyone in class thinks you're a joke",
+      "label": "harmful",
+      "tag": "direct_insult",
+      "verdict": "safe",
+      "matched": [],
+      "reasons": []
+    },
+    {
+      "text": "sh!t for brains",
+      "label": "harmful",
+      "tag": "obfuscated",
+      "verdict": "safe",
+      "matched": [
+        "shit"
+      ],
+      "reasons": [
+        "Profanity not aimed at anyone (shit): allowed"
+      ]
+    },
+    {
+      "text": "watch your back after school",
+      "label": "harmful",
+      "tag": "threat",
+      "verdict": "review",
+      "matched": [
+        "watch your back"
+      ],
+      "reasons": [
+        "Matched context-dependent terms: watch your back"
+      ]
+    },
+    {
+      "text": "i know where you live",
+      "label": "harmful",
+      "tag": "threat",
+      "verdict": "review",
+      "matched": [
+        "i know where you live"
+      ],
+      "reasons": [
+        "Matched context-dependent terms: i know where you live"
+      ]
+    },
+    {
+      "text": "i'll beat you until you can't walk",
+      "label": "harmful",
+      "tag": "threat",
+      "verdict": "safe",
+      "matched": [],
+      "reasons": []
+    },
+    {
+      "text": "i'll make you regret this",
+      "label": "harmful",
+      "tag": "threat",
+      "verdict": "safe",
+      "matched": [],
+      "reasons": []
+    },
+    {
+      "text": "you'd better sleep with one eye open",
+      "label": "harmful",
+      "tag": "threat",
+      "verdict": "safe",
+      "matched": [],
+      "reasons": []
+    },
+    {
+      "text": "nobody would miss you if you were gone",
+      "label": "harmful",
+      "tag": "self_harm",
+      "verdict": "safe",
+      "matched": [],
+      "reasons": []
+    },
+    {
+      "text": "the world would be better without you",
+      "label": "harmful",
+      "tag": "self_harm",
+      "verdict": "safe",
+      "matched": [],
+      "reasons": []
+    },
+    {
+      "text": "just end it already",
+      "label": "harmful",
+      "tag": "self_harm",
+      "verdict": "safe",
+      "matched": [],
+      "reasons": []
+    },
+    {
+      "text": "do everyone a favour and disappear forever",
+      "label": "harmful",
+      "tag": "self_harm",
+      "verdict": "safe",
+      "matched": [],
+      "reasons": []
+    },
+    {
+      "text": "all of those people are animals and should be wiped out",
+      "label": "harmful",
+      "tag": "hate",
+      "verdict": "safe",
+      "matched": [],
+      "reasons": []
+    },
+    {
+      "text": "go back to where you came from",
+      "label": "harmful",
+      "tag": "hate",
+      "verdict": "safe",
+      "matched": [],
+      "reasons": []
+    },
+    {
+      "text": "women are too stupid to vote",
+      "label": "harmful",
+      "tag": "hate",
+      "verdict": "review",
+      "matched": [
+        "stupid"
+      ],
+      "reasons": [
+        "Matched context-dependent terms: stupid"
+      ]
+    },
+    {
+      "text": "you people are a disease",
+      "label": "harmful",
+      "tag": "hate",
+      "verdict": "safe",
+      "matched": [],
+      "reasons": []
+    },
+    {
+      "text": "he's a terrorist because of his religion",
+      "label": "harmful",
+      "tag": "hate",
+      "verdict": "review",
+      "matched": [
+        "terrorist"
+      ],
+      "reasons": [
+        "Matched context-dependent terms: terrorist"
+      ]
+    },
+    {
+      "text": "join the jihadist cause and become a martyr, kill the infidels",
+      "label": "harmful",
+      "tag": "hate",
+      "verdict": "review",
+      "matched": [
+        "jihadist"
+      ],
+      "reasons": [
+        "Matched context-dependent terms: jihadist"
+      ]
+    },
+    {
+      "text": "no one will ever love you",
+      "label": "harmful",
+      "tag": "no_keywords",
+      "verdict": "safe",
+      "matched": [],
+      "reasons": []
+    },
+    {
+      "text": "you're a waste of oxygen",
+      "label": "harmful",
+      "tag": "no_keywords",
+      "verdict": "safe",
+      "matched": [],
+      "reasons": []
+    },
+    {
+      "text": "everyone laughs at you behind your back",
+      "label": "harmful",
+      "tag": "no_keywords",
+      "verdict": "safe",
+      "matched": [],
+      "reasons": []
+    },
+    {
+      "text": "your parents must be so ashamed of you",
+      "label": "harmful",
+      "tag": "no_keywords",
+      "verdict": "safe",
+      "matched": [],
+      "reasons": []
+    },
+    {
+      "text": "you look like something the cat dragged in",
+      "label": "harmful",
+      "tag": "no_keywords",
+      "verdict": "safe",
+      "matched": [],
+      "reasons": []
+    },
+    {
+      "text": "you have the brain of a goldfish",
+      "label": "harmful",
+      "tag": "no_keywords",
+      "verdict": "safe",
+      "matched": [],
+      "reasons": []
+    },
+    {
+      "text": "nobody invited you, leave",
+      "label": "harmful",
+      "tag": "no_keywords",
+      "verdict": "safe",
+      "matched": [],
+      "reasons": []
+    },
+    {
+      "text": "you'll never amount to anything",
+      "label": "harmful",
+      "tag": "no_keywords",
+      "verdict": "safe",
+      "matched": [],
+      "reasons": []
+    },
+    {
+      "text": "you should be embarrassed to even exist",
+      "label": "harmful",
+      "tag": "no_keywords",
+      "verdict": "safe",
+      "matched": [],
+      "reasons": []
+    },
+    {
+      "text": "that movie was the bomb",
+      "label": "safe",
+      "tag": "everyday",
+      "verdict": "review",
+      "matched": [
+        "bomb"
+      ],
+      "reasons": [
+        "Matched context-dependent terms: bomb"
+      ]
+    },
+    {
+      "text": "mad respect for the volunteers",
+      "label": "safe",
+      "tag": "lookalike",
+      "verdict": "review",
+      "matched": [
+        "mad"
+      ],
+      "reasons": [
+        "Matched context-dependent terms: mad"
+      ]
+    },
+    {
+      "text": "i'm mad at myself for missing the bus",
+      "label": "safe",
+      "tag": "lookalike",
+      "verdict": "review",
+      "matched": [
+        "mad"
+      ],
+      "reasons": [
+        "Matched context-dependent terms: mad"
+      ]
+    },
+    {
+      "text": "The news covered the Boko Haram kidnapping in the north today.",
+      "label": "safe",
+      "tag": "news_counterspeech",
+      "verdict": "review",
+      "matched": [
+        "boko haram",
+        "kidnapping"
+      ],
+      "reasons": [
+        "Matched context-dependent terms: boko haram, kidnapping"
+      ]
+    },
+    {
+      "text": "Calling someone a loser online is bullying. Please stop.",
+      "label": "safe",
+      "tag": "news_counterspeech",
+      "verdict": "flagged",
+      "matched": [
+        "loser"
+      ],
+      "reasons": [
+        "Matched high-severity terms: loser"
+      ]
+    },
+    {
+      "text": "the documentary explains how ISIS recruited online",
+      "label": "safe",
+      "tag": "news_counterspeech",
+      "verdict": "review",
+      "matched": [
+        "isis"
+      ],
+      "reasons": [
+        "Matched context-dependent terms: isis"
+      ]
+    },
+    {
+      "text": "my grandfather fought against the nazis",
+      "label": "safe",
+      "tag": "news_counterspeech",
+      "verdict": "review",
+      "matched": [
+        "nazi"
+      ],
+      "reasons": [
+        "Matched context-dependent terms: nazi"
+      ]
+    },
+    {
+      "text": "police arrested a gunman after the attack",
+      "label": "safe",
+      "tag": "news_counterspeech",
+      "verdict": "review",
+      "matched": [
+        "gunman"
+      ],
+      "reasons": [
+        "Matched context-dependent terms: gunman"
+      ]
+    },
+    {
+      "text": "if someone tells you to kill yourself, report it and talk to someone you trust",
+      "label": "safe",
+      "tag": "news_counterspeech",
+      "verdict": "flagged",
+      "matched": [
+        "kill yourself"
+      ],
+      "reasons": [
+        "Matched high-severity terms: kill yourself"
+      ]
+    },
+    {
+      "text": "the hostage situation ended peacefully",
+      "label": "safe",
+      "tag": "news_counterspeech",
+      "verdict": "review",
+      "matched": [
+        "hostage"
+      ],
+      "reasons": [
+        "Matched context-dependent terms: hostage"
+      ]
+    },
+    {
+      "text": "that exam was stupid hard",
+      "label": "safe",
+      "tag": "borderline",
+      "verdict": "review",
+      "matched": [
+        "stupid"
+      ],
+      "reasons": [
+        "Matched context-dependent terms: stupid"
+      ]
+    },
+    {
+      "text": "this game sucks",
+      "label": "safe",
+      "tag": "borderline",
+      "verdict": "review",
+      "matched": [
+        "suck"
+      ],
+      "reasons": [
+        "Matched context-dependent terms: suck"
+      ]
+    },
+    {
+      "text": "I'm such an idiot, I left my wallet at home",
+      "label": "safe",
+      "tag": "borderline",
+      "verdict": "review",
+      "matched": [
+        "idiot"
+      ],
+      "reasons": [
+        "Matched context-dependent terms: idiot"
+      ]
+    },
+    {
+      "text": "stop being lame and come to the party",
+      "label": "safe",
+      "tag": "borderline",
+      "verdict": "review",
+      "matched": [
+        "lame"
+      ],
+      "reasons": [
+        "Matched context-dependent terms: lame"
+      ]
+    },
+    {
+      "text": "ugh I look so ugly in this photo",
+      "label": "safe",
+      "tag": "borderline",
+      "verdict": "review",
+      "matched": [
+        "ugly"
+      ],
+      "reasons": [
+        "Matched context-dependent terms: ugly"
+      ]
+    },
+    {
+      "text": "this song is a total bop, you fool",
+      "label": "safe",
+      "tag": "borderline",
+      "verdict": "flagged",
+      "matched": [
+        "fool"
+      ],
+      "reasons": [
+        "Insult or profanity aimed at a person: fool"
+      ]
+    },
+    {
+      "text": "you dumbo, you forgot the snacks haha",
+      "label": "safe",
+      "tag": "borderline",
+      "verdict": "flagged",
+      "matched": [
+        "dumbo"
+      ],
+      "reasons": [
+        "Insult or profanity aimed at a person: dumbo"
+      ]
+    }
+  ]
+}

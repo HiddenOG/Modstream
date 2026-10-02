@@ -15,6 +15,10 @@ Measured with [`loadgen.py`](loadgen.py). Raw reports are in [`results/`](result
   (Linux containers get uvloop), and Windows timers have ~15 ms granularity,
   which inflates small waits such as the 5 ms batching window.
 
+> These runs used rules v1. Rules v2 ([evaluation](../evaluation/README.md)) is ~2.4x slower per
+> message (0.13 ms vs 0.055 ms), a small share of the ~0.45 ms per-message serving cost; re-run
+> pending.
+
 ## Synchronous path: WebSocket `analyze` round trips
 
 | Streams | Offered load | Server processes | Answered | Errors | Throughput | p50 | p95 | p99 |

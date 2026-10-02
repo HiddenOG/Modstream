@@ -113,6 +113,16 @@ All settings are environment variables prefixed with `MODSTREAM_` ([config.py](m
 | `MODSTREAM_FLAG_THRESHOLD` / `MODSTREAM_REVIEW_THRESHOLD` | `0.7` / `0.4` | Verdict policy |
 | `MODSTREAM_SECRET_KEY` | random | **Required** when `MODSTREAM_ENV=prod` (shared across processes) |
 
+## Accuracy
+
+Measured on a hand-labelled set of 179 messages, including disguised spellings, threats and
+friendly banter ([evaluation/](evaluation/README.md)):
+
+| Detector | Catch rate | False alarms |
+|---|---:|---:|
+| Rules v1 (word lists) | 28.0% | 5.6% |
+| Rules v2 (targeting + disguise resistance) | 74.8% | 5.6% |
+
 ## Testing & load testing
 
 ```bash
