@@ -197,3 +197,16 @@ def test_missing_post_returns_404(client):
 def test_api_unknown_route_is_json(client):
     res = client.get("/api/v1/nope")
     assert res.status_code == 404 and res.json()["error"]["code"] == "not_found"
+
+
+def test_timestamps_are_timezone_aware(client):
+    """Stored timestamps must carry their UTC offset; SQLite drops it on read, and
+    browsers would otherwise show new posts as hours old in non-UTC timezones."""
+    post = client.post("/api/v1/posts", json={"text": "hello"}).json()
+    client.post(f"/api/v1/posts/{post['id']}/comments", json={"text": "hi"})
+    client.post("/api/v1/messages", json={"messages": [{"text": "hey"}]})
+    listed = client.get("/api/v1/posts").json()["posts"][0]
+    stored = wait_for(lambda: client.get("/api/v1/messages").json()["messages"])
+    for stamp in (listed["created_at"], listed["comments"][0]["created_at"], stored[0]["created_at"],
+                  stored[0]["enqueued_at"]):
+        assert stamp.endswith("+00:00"), stamp

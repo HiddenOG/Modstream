@@ -38,7 +38,11 @@ class Base(DeclarativeBase):
         out = {}
         for col in self.__table__.columns:
             value = getattr(self, col.key)
-            out[col.key] = value.isoformat() if isinstance(value, datetime) else value
+            if isinstance(value, datetime):
+                # SQLite drops the timezone on read; every timestamp is written in UTC, so restore it.
+                # Without this, browsers parse the time as local and show e.g. "1 hr. ago" for new posts.
+                value = (value if value.tzinfo else value.replace(tzinfo=UTC)).isoformat()
+            out[col.key] = value
         return out
 
 
