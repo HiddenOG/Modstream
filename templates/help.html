@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CyberShield - User Guide</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="bg-light">
+
+<!-- Navbar -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <div class="container">
+        <a class="navbar-brand fw-bold" href="/">CyberShield</a>
+        <div class="d-flex gap-2">
+            <a class="btn btn-light btn-sm" href="/">Home</a>
+            <a class="btn btn-light btn-sm" href="/paste">Paste</a>
+            <a class="btn btn-light btn-sm" href="/chatbot">Chatbot</a>
+            <a class="btn btn-light btn-sm" href="/facebook">Facebook</a>
+            <a class="btn btn-light btn-sm" href="/facebook/live">Feed</a>
+            <a class="btn btn-light btn-sm" href="/actions">Actions</a>
+        </div>
+    </div>
+</nav>
+
+<!-- Header -->
+<section class="text-center py-5 bg-white shadow-sm">
+    <div class="container">
+        <h1 class="fw-bold">CyberShield User Guide</h1>
+        <p class="lead text-muted">Learn how to use the app efficiently and understand its AI-powered features.</p>
+    </div>
+</section>
+
+<!-- Content Section -->
+<section class="py-5">
+    <div class="container">
+
+        <!-- Overview -->
+        <div class="mb-5">
+            <h2>Overview</h2>
+            <p>SafeText is an AI-powered platform designed to detect and manage harmful content online. It focuses on cyberbullying, terrorism-related content, and racist remarks.</p>
+            <ul>
+                <li><strong>Text Analysis:</strong> Check any text for harmful content.</li>
+                <li><strong>Mini Social Feed:</strong> Post and comment safely with real-time monitoring.</li>
+                <li><strong>Live Monitoring Feed:</strong> Track flagged comments and posts with counters.</li>
+                <li><strong>Chatbot Assistance:</strong> Get AI guidance on safe online interactions.</li>
+                <li><strong>Actions Page:</strong> Guidance for handling flagged content.</li>
+            </ul>
+        </div>
+
+        <!-- Models -->
+        <div class="mb-5">
+            <h2>Models Used</h2>
+            <ul>
+                <li><strong>Toxic Content Detection:</strong> <em>unitary/toxic-bert</em> for identifying abusive comments.</li>
+                <li><strong>Detoxification Analysis:</strong> <em>Detoxify</em> model for detecting identity-based hate and toxic text.</li>
+                <li><strong>Keyword Lists:</strong> Predefined lists for terrorism-related terms and racist slurs for quick detection.</li>
+            </ul>
+        </div>
+
+        <!-- How to Use -->
+        <div class="mb-5">
+            <h2>Using SafeText</h2>
+            <ol>
+                <li><strong>Home Page:</strong> Access `/` to see current stats, charts, and quick links.</li>
+                <li><strong>Paste Text:</strong> Navigate to `/paste` and input text for analysis.</li>
+                <li><strong>Mini Social Feed:</strong> Navigate to `/facebook` to post messages and monitor flagged content.</li>
+                <li><strong>Live Monitoring Feed:</strong> Navigate to `/facebook/live` to watch flagged posts/comments in real-time.</li>
+                <li><strong>Chatbot:</strong> Navigate to `/chatbot` to interact with the AI and get real-time feedback.</li>
+                <li><strong>Actions:</strong> Navigate to `/actions` for recommended steps for flagged content.</li>
+            </ol>
+        </div>
+
+        <!-- Developer Info -->
+        <div class="mb-5">
+            <h2>Developer Instructions</h2>
+            <p>Follow these steps to run SafeText on your PC:</p>
+            <ol>
+                <li><strong>Install Python</strong> (if not already installed). Make sure <code>python --version</code> works in your terminal or command prompt.</li>
+                <li><strong>Install required packages:</strong> Open your terminal/command prompt and run:
+                    <pre>
+        pip install flask transformers detoxify torch
+                    </pre>
+                </li>
+                <li><strong>Start the Flask app:</strong> In the terminal, navigate to the folder containing <code>app.py</code> and run:
+                    <pre>
+        python app.py
+                    </pre>
+                </li>
+                <li><strong>Open SafeText in your browser:</strong> Go to <code>http://127.0.0.1:5000/</code>. This is the home page.</li>
+                <li>Use the navbar to navigate between pages like <strong>Paste</strong>, <strong>Chatbot</strong>, <strong>Facebook</strong>, <strong>Feed</strong>, and <strong>Actions</strong>. You can always return to Home easily.</li>
+            </ol>
+            <p><em>Tip:</em> Keep the terminal running while using the app to see logs and live updates.</p>
+        </div>
+
+
+        <!-- Tips -->
+        <div class="mb-5">
+            <h2>Tips for Efficient Use</h2>
+            <ul>
+                <li>Use <strong>Paste Text</strong> for quick analysis of any message.</li>
+                <li>Post content in <strong>Mini Social Feed</strong> to see real-time flagging.</li>
+                <li>Use <strong>Live Monitoring Feed</strong> for multiple posts/comments tracking.</li>
+                <li>Follow <strong>Actions Page</strong> for recommended steps after harmful content is detected.</li>
+            </ul>
+        </div>
+
+        <div class="text-center">
+            <a href="/" class="btn btn-primary btn-lg">Back to Home</a>
+        </div>
+    </div>
+</section>
+
+</body>
+</html>

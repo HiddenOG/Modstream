@@ -1,0 +1,10 @@
+flask
+werkzeug
+detoxify
+transformers
+torch
+gunicorn
+
+
+
+
