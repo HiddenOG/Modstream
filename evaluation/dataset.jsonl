@@ -1,0 +1,179 @@
+{"text": "you're such a loser", "label": "harmful", "tag": "direct_insult"}
+{"text": "you are an idiot and everyone knows it", "label": "harmful", "tag": "direct_insult"}
+{"text": "shut up you moron", "label": "harmful", "tag": "direct_insult"}
+{"text": "you're so stupid it hurts", "label": "harmful", "tag": "direct_insult"}
+{"text": "ugly cow", "label": "harmful", "tag": "direct_insult"}
+{"text": "you're ugly and nobody wants you here", "label": "harmful", "tag": "direct_insult"}
+{"text": "what a pathetic loser you are", "label": "harmful", "tag": "direct_insult"}
+{"text": "you dumb bitch", "label": "harmful", "tag": "direct_insult"}
+{"text": "you're a disgusting pig", "label": "harmful", "tag": "direct_insult"}
+{"text": "stop talking, you absolute clown", "label": "harmful", "tag": "direct_insult"}
+{"text": "you are a waste of space", "label": "harmful", "tag": "direct_insult"}
+{"text": "go cry somewhere else you baby, nobody cares", "label": "harmful", "tag": "direct_insult"}
+{"text": "you're a fat slob", "label": "harmful", "tag": "direct_insult"}
+{"text": "imagine being this dumb", "label": "harmful", "tag": "direct_insult"}
+{"text": "you are a bastard", "label": "harmful", "tag": "direct_insult"}
+{"text": "your fada", "label": "harmful", "tag": "direct_insult"}
+{"text": "you dey craze, mumu", "label": "harmful", "tag": "direct_insult"}
+{"text": "you be olodo, you no sabi anything", "label": "harmful", "tag": "direct_insult"}
+{"text": "everyone in class thinks you're a joke", "label": "harmful", "tag": "direct_insult"}
+{"text": "you're such a slut", "label": "harmful", "tag": "direct_insult"}
+{"text": "dumbass", "label": "harmful", "tag": "direct_insult"}
+{"text": "what an asshole you are", "label": "harmful", "tag": "direct_insult"}
+{"text": "you jerk, you ruined everything", "label": "harmful", "tag": "direct_insult"}
+{"text": "you are retarded", "label": "harmful", "tag": "direct_insult"}
+{"text": "freak. nobody likes you", "label": "harmful", "tag": "direct_insult"}
+{"text": "fuck you", "label": "harmful", "tag": "directed_profanity"}
+{"text": "fuck your mother", "label": "harmful", "tag": "directed_profanity"}
+{"text": "fuck you and your whole family", "label": "harmful", "tag": "directed_profanity"}
+{"text": "screw you, loser", "label": "harmful", "tag": "directed_profanity"}
+{"text": "go fuck yourself", "label": "harmful", "tag": "directed_profanity"}
+{"text": "your mom is a whore", "label": "harmful", "tag": "directed_profanity"}
+{"text": "ur mom is a hoe", "label": "harmful", "tag": "directed_profanity"}
+{"text": "shut the fuck up", "label": "harmful", "tag": "directed_profanity"}
+{"text": "you piece of shit", "label": "harmful", "tag": "directed_profanity"}
+{"text": "you're a fucking idiot", "label": "harmful", "tag": "directed_profanity"}
+{"text": "eat shit and die", "label": "harmful", "tag": "directed_profanity"}
+{"text": "fuck off and never come back", "label": "harmful", "tag": "directed_profanity"}
+{"text": "you stupid fuck", "label": "harmful", "tag": "directed_profanity"}
+{"text": "stfu nobody asked you", "label": "harmful", "tag": "directed_profanity"}
+{"text": "gtfo of this server", "label": "harmful", "tag": "directed_profanity"}
+{"text": "fuc your mom", "label": "harmful", "tag": "obfuscated"}
+{"text": "f*ck you", "label": "harmful", "tag": "obfuscated"}
+{"text": "f**k you", "label": "harmful", "tag": "obfuscated"}
+{"text": "fuuuuck you", "label": "harmful", "tag": "obfuscated"}
+{"text": "f u c k you", "label": "harmful", "tag": "obfuscated"}
+{"text": "f.u.c.k off", "label": "harmful", "tag": "obfuscated"}
+{"text": "fck you", "label": "harmful", "tag": "obfuscated"}
+{"text": "phuck you", "label": "harmful", "tag": "obfuscated"}
+{"text": "fk u", "label": "harmful", "tag": "obfuscated"}
+{"text": "ur an 1d10t", "label": "harmful", "tag": "obfuscated"}
+{"text": "you l0ser", "label": "harmful", "tag": "obfuscated"}
+{"text": "$tupid b1tch", "label": "harmful", "tag": "obfuscated"}
+{"text": "you're a m0r0n", "label": "harmful", "tag": "obfuscated"}
+{"text": "sh!t for brains", "label": "harmful", "tag": "obfuscated"}
+{"text": "b!tch please, you're nothing", "label": "harmful", "tag": "obfuscated"}
+{"text": "you are such a looooser", "label": "harmful", "tag": "obfuscated"}
+{"text": "stuuupid idiooot", "label": "harmful", "tag": "obfuscated"}
+{"text": "i d i o t", "label": "harmful", "tag": "obfuscated"}
+{"text": "k y s", "label": "harmful", "tag": "obfuscated"}
+{"text": "go k1ll yourself", "label": "harmful", "tag": "obfuscated"}
+{"text": "a$$hole", "label": "harmful", "tag": "obfuscated"}
+{"text": "you f-ing idiot", "label": "harmful", "tag": "obfuscated"}
+{"text": "mf you're dead to me", "label": "harmful", "tag": "obfuscated"}
+{"text": "motherf*cker", "label": "harmful", "tag": "obfuscated"}
+{"text": "you absolute fcking clown", "label": "harmful", "tag": "obfuscated"}
+{"text": "i will kill you", "label": "harmful", "tag": "threat"}
+{"text": "i'm going to find you and hurt you", "label": "harmful", "tag": "threat"}
+{"text": "watch your back after school", "label": "harmful", "tag": "threat"}
+{"text": "i know where you live", "label": "harmful", "tag": "threat"}
+{"text": "you will die tomorrow", "label": "harmful", "tag": "threat"}
+{"text": "gonna kill you if you show up", "label": "harmful", "tag": "threat"}
+{"text": "i'll beat you until you can't walk", "label": "harmful", "tag": "threat"}
+{"text": "say that again and i'll stab you", "label": "harmful", "tag": "threat"}
+{"text": "i'll make you regret this", "label": "harmful", "tag": "threat"}
+{"text": "we're going to bomb your house", "label": "harmful", "tag": "threat"}
+{"text": "i will shoot up the school", "label": "harmful", "tag": "threat"}
+{"text": "you'd better sleep with one eye open", "label": "harmful", "tag": "threat"}
+{"text": "kill yourself", "label": "harmful", "tag": "self_harm"}
+{"text": "kys", "label": "harmful", "tag": "self_harm"}
+{"text": "go die", "label": "harmful", "tag": "self_harm"}
+{"text": "nobody would miss you if you were gone", "label": "harmful", "tag": "self_harm"}
+{"text": "the world would be better without you", "label": "harmful", "tag": "self_harm"}
+{"text": "just end it already", "label": "harmful", "tag": "self_harm"}
+{"text": "do everyone a favour and disappear forever", "label": "harmful", "tag": "self_harm"}
+{"text": "why don't you just jump off a bridge", "label": "harmful", "tag": "self_harm"}
+{"text": "go back to your country you nigger", "label": "harmful", "tag": "hate"}
+{"text": "stupid paki", "label": "harmful", "tag": "hate"}
+{"text": "white power forever", "label": "harmful", "tag": "hate"}
+{"text": "all of those people are animals and should be wiped out", "label": "harmful", "tag": "hate"}
+{"text": "go back to where you came from", "label": "harmful", "tag": "hate"}
+{"text": "dirty wetback", "label": "harmful", "tag": "hate"}
+{"text": "women are too stupid to vote", "label": "harmful", "tag": "hate"}
+{"text": "you people are a disease", "label": "harmful", "tag": "hate"}
+{"text": "chink go home", "label": "harmful", "tag": "hate"}
+{"text": "he's a terrorist because of his religion", "label": "harmful", "tag": "hate"}
+{"text": "join the jihadist cause and become a martyr, kill the infidels", "label": "harmful", "tag": "hate"}
+{"text": "raghead", "label": "harmful", "tag": "hate"}
+{"text": "you're worthless and pathetic", "label": "harmful", "tag": "no_keywords"}
+{"text": "no one will ever love you", "label": "harmful", "tag": "no_keywords"}
+{"text": "you're a waste of oxygen", "label": "harmful", "tag": "no_keywords"}
+{"text": "everyone laughs at you behind your back", "label": "harmful", "tag": "no_keywords"}
+{"text": "your parents must be so ashamed of you", "label": "harmful", "tag": "no_keywords"}
+{"text": "you look like something the cat dragged in", "label": "harmful", "tag": "no_keywords"}
+{"text": "you have the brain of a goldfish", "label": "harmful", "tag": "no_keywords"}
+{"text": "nobody invited you, leave", "label": "harmful", "tag": "no_keywords"}
+{"text": "you'll never amount to anything", "label": "harmful", "tag": "no_keywords"}
+{"text": "you should be embarrassed to even exist", "label": "harmful", "tag": "no_keywords"}
+{"text": "Great game today, proud of the whole team!", "label": "safe", "tag": "everyday"}
+{"text": "can someone send me the notes from today's lecture?", "label": "safe", "tag": "everyday"}
+{"text": "happy birthday!! hope you have the best day", "label": "safe", "tag": "everyday"}
+{"text": "omw, be there in 5 minutes", "label": "safe", "tag": "everyday"}
+{"text": "thanks for helping me with the project", "label": "safe", "tag": "everyday"}
+{"text": "who's coming to practice tonight?", "label": "safe", "tag": "everyday"}
+{"text": "this playlist is fire", "label": "safe", "tag": "everyday"}
+{"text": "lol that meme is hilarious", "label": "safe", "tag": "everyday"}
+{"text": "see you all on monday", "label": "safe", "tag": "everyday"}
+{"text": "i love you guys so much", "label": "safe", "tag": "everyday"}
+{"text": "good luck on your exam tomorrow, you've got this", "label": "safe", "tag": "everyday"}
+{"text": "the new update looks really clean", "label": "safe", "tag": "everyday"}
+{"text": "anyone want to grab lunch?", "label": "safe", "tag": "everyday"}
+{"text": "my phone died again ugh", "label": "safe", "tag": "everyday"}
+{"text": "congrats on the new job!", "label": "safe", "tag": "everyday"}
+{"text": "you're amazing, never change", "label": "safe", "tag": "everyday"}
+{"text": "can you send the link again?", "label": "safe", "tag": "everyday"}
+{"text": "we killed it at the concert last night", "label": "safe", "tag": "everyday"}
+{"text": "you crushed that presentation", "label": "safe", "tag": "everyday"}
+{"text": "that movie was the bomb", "label": "safe", "tag": "everyday"}
+{"text": "i'm dying of laughter", "label": "safe", "tag": "everyday"}
+{"text": "this traffic is fucking awful", "label": "safe", "tag": "undirected_profanity"}
+{"text": "that concert was fucking amazing", "label": "safe", "tag": "undirected_profanity"}
+{"text": "holy shit, we won!", "label": "safe", "tag": "undirected_profanity"}
+{"text": "damn, i forgot my keys again", "label": "safe", "tag": "undirected_profanity"}
+{"text": "what the fuck happened to the wifi", "label": "safe", "tag": "undirected_profanity"}
+{"text": "this exam was a bitch", "label": "safe", "tag": "undirected_profanity"}
+{"text": "shit, i'm late", "label": "safe", "tag": "undirected_profanity"}
+{"text": "fuck yeah, payday!", "label": "safe", "tag": "undirected_profanity"}
+{"text": "i'm so fucking tired today", "label": "safe", "tag": "undirected_profanity"}
+{"text": "this pizza is damn good", "label": "safe", "tag": "undirected_profanity"}
+{"text": "oh crap, the bus left", "label": "safe", "tag": "undirected_profanity"}
+{"text": "my code is a shitshow today lol", "label": "safe", "tag": "undirected_profanity"}
+{"text": "I made a cake for the party", "label": "safe", "tag": "lookalike"}
+{"text": "what a skillful player", "label": "safe", "tag": "lookalike"}
+{"text": "the classic assignment is due friday", "label": "safe", "tag": "lookalike"}
+{"text": "I grew up in Scunthorpe", "label": "safe", "tag": "lookalike"}
+{"text": "she gave a passionate speech", "label": "safe", "tag": "lookalike"}
+{"text": "mad respect for the volunteers", "label": "safe", "tag": "lookalike"}
+{"text": "the bombastic speech went on forever", "label": "safe", "tag": "lookalike"}
+{"text": "we watched cocktail making at the bar", "label": "safe", "tag": "lookalike"}
+{"text": "the hoe is in the garden shed", "label": "safe", "tag": "lookalike"}
+{"text": "my dad is a firefighter", "label": "safe", "tag": "lookalike"}
+{"text": "please pass the assessment forms", "label": "safe", "tag": "lookalike"}
+{"text": "the punishment should fit the crime", "label": "safe", "tag": "lookalike"}
+{"text": "i'm mad at myself for missing the bus", "label": "safe", "tag": "lookalike"}
+{"text": "dickens wrote great novels", "label": "safe", "tag": "lookalike"}
+{"text": "you are so smart", "label": "safe", "tag": "lookalike"}
+{"text": "The news covered the Boko Haram kidnapping in the north today.", "label": "safe", "tag": "news_counterspeech"}
+{"text": "Calling someone a loser online is bullying. Please stop.", "label": "safe", "tag": "news_counterspeech"}
+{"text": "racism has no place in our school", "label": "safe", "tag": "news_counterspeech"}
+{"text": "the documentary explains how ISIS recruited online", "label": "safe", "tag": "news_counterspeech"}
+{"text": "my grandfather fought against the nazis", "label": "safe", "tag": "news_counterspeech"}
+{"text": "police arrested a gunman after the attack", "label": "safe", "tag": "news_counterspeech"}
+{"text": "if someone tells you to kill yourself, report it and talk to someone you trust", "label": "safe", "tag": "news_counterspeech"}
+{"text": "she studies sharia law and the history of jihad at university", "label": "safe", "tag": "news_counterspeech"}
+{"text": "the hostage situation ended peacefully", "label": "safe", "tag": "news_counterspeech"}
+{"text": "I'm a proud gay man and I'm tired of hate", "label": "safe", "tag": "news_counterspeech"}
+{"text": "as a muslim woman i feel welcome here", "label": "safe", "tag": "news_counterspeech"}
+{"text": "the article explains why slurs like that are harmful", "label": "safe", "tag": "news_counterspeech"}
+{"text": "that exam was stupid hard", "label": "safe", "tag": "borderline"}
+{"text": "you're crazy lol, that was so funny", "label": "safe", "tag": "borderline"}
+{"text": "lol shut up, no way that happened", "label": "safe", "tag": "borderline"}
+{"text": "this game sucks", "label": "safe", "tag": "borderline"}
+{"text": "you're going to kill it on stage tonight", "label": "safe", "tag": "borderline"}
+{"text": "I'm such an idiot, I left my wallet at home", "label": "safe", "tag": "borderline"}
+{"text": "stop being lame and come to the party", "label": "safe", "tag": "borderline"}
+{"text": "my brother is so annoying lol", "label": "safe", "tag": "borderline"}
+{"text": "that ref was blind today", "label": "safe", "tag": "borderline"}
+{"text": "ugh I look so ugly in this photo", "label": "safe", "tag": "borderline"}
+{"text": "this song is a total bop, you fool", "label": "safe", "tag": "borderline"}
+{"text": "you dumbo, you forgot the snacks haha", "label": "safe", "tag": "borderline"}
