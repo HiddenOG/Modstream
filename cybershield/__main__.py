@@ -21,8 +21,12 @@ from .config import Settings
 def run_api(args) -> None:
     import uvicorn
 
-    uvicorn.run("app:app", host=args.host, port=args.port, reload=args.reload, proxy_headers=True,
-                forwarded_allow_ips="*", log_level="info")
+    uvicorn.run(
+        "app:app", host=args.host, port=args.port, reload=args.reload, workers=args.workers,
+        proxy_headers=True, forwarded_allow_ips="*", log_level="info", access_log=False,
+        # Small JSON frames gain little from compression but cost CPU on both ends.
+        ws_per_message_deflate=False,
+    )
 
 
 async def run_worker(args) -> None:
@@ -56,6 +60,7 @@ def main() -> None:
     api.add_argument("--host", default="127.0.0.1")
     api.add_argument("--port", type=int, default=8000)
     api.add_argument("--reload", action="store_true")
+    api.add_argument("--workers", type=int, default=1, help="processes (with Redis; in-memory broker is per process)")
     worker = sub.add_parser("worker", help="run stream workers")
     worker.add_argument("--concurrency", type=int, default=1)
     worker.add_argument("--metrics-port", type=int, default=9100)

@@ -45,7 +45,7 @@ async def test_slow_subscriber_drops_instead_of_blocking():
         assert slow.take_dropped() == 0
         # The hub kept going for everyone else.
         drained = [await fast.get(0.1) for _ in range(5)]
-        assert all(drained)
+        assert all(drained) and all(d.event["channel"] == "a" for d in drained)
     finally:
         await hub.stop()
 

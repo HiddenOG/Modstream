@@ -13,8 +13,10 @@ from the durable log.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from collections.abc import Callable
+from functools import cached_property
 
 from . import metrics
 from .broker import Broker, Entry
@@ -22,6 +24,24 @@ from .broker import Broker, Entry
 log = logging.getLogger(__name__)
 
 EventFilter = Callable[[dict], bool]
+
+
+class HubEvent:
+    """An event plus its wire encodings, computed once and shared by every
+    subscriber (serializing per subscriber dominated fan-out CPU)."""
+
+    __slots__ = ("id", "event", "__dict__")
+
+    def __init__(self, entry: Entry):
+        self.id, self.event = entry
+
+    @cached_property
+    def sse(self) -> str:
+        return f"id: {self.id}\nevent: {self.event['type']}\ndata: {json.dumps(self.event['data'])}\n\n"
+
+    @cached_property
+    def ws(self) -> str:
+        return f'{{"type":"event","id":{json.dumps(self.id)},"event":{json.dumps(self.event)}}}'
 
 
 def make_filter(channel: str | None = None, verdicts: set[str] | None = None) -> EventFilter:
@@ -38,19 +58,19 @@ class Subscription:
         self._hub = hub
         self.accept = accept
         self.transport = transport
-        self.queue: asyncio.Queue[Entry] = asyncio.Queue(maxsize=maxsize)
+        self.queue: asyncio.Queue[HubEvent] = asyncio.Queue(maxsize=maxsize)
         self.dropped = 0
 
-    def offer(self, entry: Entry) -> None:
-        if not self.accept(entry[1]):
+    def offer(self, item: HubEvent) -> None:
+        if not self.accept(item.event):
             return
         try:
-            self.queue.put_nowait(entry)
+            self.queue.put_nowait(item)
         except asyncio.QueueFull:
             self.dropped += 1
             metrics.HUB_DROPPED.inc()
 
-    async def get(self, timeout: float) -> Entry | None:
+    async def get(self, timeout: float) -> HubEvent | None:
         try:
             return await asyncio.wait_for(self.queue.get(), timeout)
         except TimeoutError:
@@ -117,5 +137,6 @@ class Hub:
                 continue
             for entry in entries:
                 self.last_id = entry[0]
+                item = HubEvent(entry)
                 for sub in tuple(self._subs):
-                    sub.offer(entry)
+                    sub.offer(item)

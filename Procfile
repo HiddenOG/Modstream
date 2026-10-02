@@ -1,1 +1,1 @@
-web: gunicorn app:app --worker-class gthread --workers 1 --threads 8 --timeout 120 --bind 0.0.0.0:$PORT
+web: uvicorn app:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips '*' --no-access-log --ws-per-message-deflate false

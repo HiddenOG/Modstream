@@ -81,7 +81,8 @@ class Runtime:
     async def start(self, *, api: bool = True, workers: int | None = None) -> None:
         from .worker import Worker
 
-        await db.create_schema(self.engine)
+        if self.settings.create_schema:
+            await db.create_schema(self.engine)
         await self.broker.start()
         await self.batcher.start()
         if api:

@@ -1,12 +1,78 @@
+# Full stack: API, worker pool, Redis Streams, Postgres, Prometheus, Grafana.
+#   docker compose up --build
+#   docker compose up --scale worker=4      # more moderation throughput
+# App: http://localhost:8000  API docs: /docs  Grafana: http://localhost:3000
+
+x-app: &app
+  build: .
+  environment: &app-env
+    CS_ENV: prod
+    CS_SECRET_KEY: ${CS_SECRET_KEY:-change-me-in-production}
+    CS_DATABASE_URL: postgresql+asyncpg://cybershield:cybershield@postgres:5432/cybershield
+    CS_REDIS_URL: redis://redis:6379/0
+    CS_LOG_JSON: "true"
+  depends_on:
+    redis: { condition: service_healthy }
+    postgres: { condition: service_healthy }
+  restart: unless-stopped
+
 services:
-  web:
-    build: .
-    ports:
-      - "8000:8000"
+  api:
+    <<: *app
     environment:
-      SECRET_KEY: change-me
+      <<: *app-env
+      CS_RUN_WORKER: "false"        # workers run in their own service
+    ports: ["8000:8000"]
+    volumes: [uploads:/app/instance/uploads]
+
+  worker:
+    <<: *app
+    command: ["python", "-m", "cybershield", "worker", "--concurrency", "1", "--metrics-port", "9100"]
+    environment:
+      <<: *app-env
+      CS_WARMUP: "true"
+    deploy:
+      replicas: 2
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes: [redis:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: cybershield
+      POSTGRES_PASSWORD: cybershield
+      POSTGRES_DB: cybershield
+    volumes: [postgres:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cybershield"]
+      interval: 5s
+      retries: 10
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    volumes: [./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro]
+    ports: ["9090:9090"]
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/cybershield.json
     volumes:
-      - data:/app/instance
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports: ["3000:3000"]
+    depends_on: [prometheus]
 
 volumes:
-  data:
+  uploads:
+  redis:
+  postgres:

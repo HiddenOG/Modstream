@@ -5,7 +5,7 @@ from __future__ import annotations
 import secrets
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -18,6 +18,7 @@ class Settings(BaseSettings):
 
     # Infrastructure. Leave redis_url unset to run everything in one process.
     database_url: str = "sqlite+aiosqlite:///instance/cybershield.db"
+    create_schema: bool = True  # turn off when schema changes are applied by a deploy step
     redis_url: str | None = None
     upload_dir: str = "instance/uploads"
     max_upload_bytes: int = 5 * 1024 * 1024
@@ -51,3 +52,10 @@ class Settings(BaseSettings):
 
     enable_simulator: bool = True
     simulator_max_messages: int = 50_000
+
+    @model_validator(mode="after")
+    def _require_shared_secret(self):
+        # A per-process random key breaks sessions as soon as there is more than one process.
+        if self.env == "prod" and "secret_key" not in self.model_fields_set:
+            raise ValueError("CS_SECRET_KEY must be set when CS_ENV=prod")
+        return self

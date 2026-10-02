@@ -17,7 +17,7 @@ import re
 import threading
 import time
 from collections import OrderedDict
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from typing import Protocol
 
 from . import lexicon
@@ -65,7 +65,14 @@ class Analysis:
         return self.verdict == "flagged"
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        # Hand-written: dataclasses.asdict deep-copies recursively and showed up in profiles.
+        return {
+            "verdict": self.verdict, "risk": self.risk, "categories": self.categories, "reasons": self.reasons,
+            "matches": [{"term": m.term, "category": m.category, "tier": m.tier, "start": m.start, "end": m.end}
+                        for m in self.matches],
+            "model_scores": self.model_scores, "engine": self.engine, "latency_ms": self.latency_ms,
+            "chars": self.chars,
+        }
 
 
 # --- Scorers -----------------------------------------------------------------
@@ -133,40 +140,39 @@ def load_scorer(kind: str = "auto") -> Scorer:
 
 # --- Lexicon -----------------------------------------------------------------
 
-def _compile(term: str) -> re.Pattern:
+def _term_pattern(term: str) -> str:
     words = re.split(r"[\s\-]+", term)
     body = r"[\s\-_.]*".join(re.escape(w) for w in words)
     # Allow simple plurals on single words ("idiots", "losers").
-    suffix = r"(?:e?s)?" if len(words) == 1 else ""
-    return re.compile(rf"(?<![a-z0-9]){body}{suffix}(?![a-z0-9])", re.IGNORECASE)
+    return body + (r"(?:e?s)?" if len(words) == 1 else "")
 
 
-def _build_rules():
-    rules = []
+def _build_matcher() -> tuple[re.Pattern, dict[str, tuple[str, str, str]]]:
+    """Compile every term into ONE alternation so each text is scanned once
+    (~150 separate regex passes per message was the throughput bottleneck).
+
+    Alternatives are ordered longest-first: at any position the longest term
+    wins ("suicide bomber" over "bomb"), and finditer never returns overlaps."""
+    rules = {}
     for tier, table in (("strong", lexicon.STRONG), ("contextual", lexicon.CONTEXTUAL)):
         for category, terms in table.items():
-            for term in dict.fromkeys(terms):
-                rules.append((term, category, tier, _compile(term)))
-    return rules
+            for term in terms:
+                rules.setdefault(term, (category, tier))
+    ordered = sorted(rules, key=len, reverse=True)
+    groups = {f"t{i}": (term, *rules[term]) for i, term in enumerate(ordered)}
+    alternation = "|".join(f"(?P<{name}>{_term_pattern(term)})" for name, (term, *_rest) in groups.items())
+    return re.compile(rf"(?<![a-z0-9])(?:{alternation})(?![a-z0-9])", re.IGNORECASE), groups
 
 
-_RULES = _build_rules()
+_MATCHER, _GROUPS = _build_matcher()
 
 
 def find_matches(text: str) -> list[Match]:
-    normalised = text.translate(_LEET)
-    found = [
-        Match(term, category, tier, m.start(), m.end())
-        for term, category, tier, pattern in _RULES
-        for m in pattern.finditer(normalised)
-    ]
-    # Keep the longest match where spans overlap ("suicide bomber" over "bomb").
-    found.sort(key=lambda m: (m.start, -(m.end - m.start)))
-    kept: list[Match] = []
-    for match in found:
-        if not kept or match.start >= kept[-1].end:
-            kept.append(match)
-    return kept
+    out = []
+    for m in _MATCHER.finditer(text.translate(_LEET)):
+        term, category, tier = _GROUPS[m.lastgroup]
+        out.append(Match(term, category, tier, m.start(), m.end()))
+    return out
 
 
 # --- Detector ----------------------------------------------------------------
