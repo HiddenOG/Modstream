@@ -54,7 +54,7 @@ class Runtime:
     def __init__(self, settings: Settings, *, detector: Detector | None = None, broker: Broker | None = None):
         self.settings = settings
         self.detector = detector or Detector(
-            load_scorer(settings.scorer),
+            load_scorer(settings.scorer, settings.model_variant),
             flag_threshold=settings.flag_threshold,
             review_threshold=settings.review_threshold,
         )

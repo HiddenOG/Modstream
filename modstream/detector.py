@@ -123,12 +123,15 @@ class DetoxifyScorer:
         ]
 
 
-def load_scorer(kind: str = "auto") -> Scorer:
+def load_scorer(kind: str = "auto", variant: str = "unbiased") -> Scorer:
+    """``variant`` picks the Detoxify checkpoint: ``unbiased`` (RoBERTa, trained to
+    reduce false positives on identity mentions), ``original`` (BERT) or
+    ``multilingual`` (XLM-RoBERTa)."""
     if kind == "none":
         return NullScorer()
     if kind in ("auto", "detoxify"):
         if importlib.util.find_spec("detoxify") is not None:
-            return DetoxifyScorer()
+            return DetoxifyScorer(variant)
         if kind == "detoxify":
             raise RuntimeError("MODSTREAM_SCORER=detoxify but detoxify is not installed")
         log.warning("detoxify not installed; running in lexicon-only mode")
