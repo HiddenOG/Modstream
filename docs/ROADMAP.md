@@ -48,8 +48,8 @@ infrastructure that scales horizontally and can be measured.
 - [x] **5. Full local stack + load testing**: docker compose (api, worker, redis,
       postgres, prometheus, grafana); a load generator for thousands of concurrent
       streams; published benchmark numbers ([results](../loadtest/RESULTS.md)).
-      *Not yet run against real Redis/Postgres: there is no Docker on the dev machine. The CI
-      integration job (real Redis 7 + Postgres 16) covers this on the first push to GitHub.*
+      *The full test suite passes in CI against real Redis 7 and Postgres 16, and the Docker
+      image builds. The compose stack and Grafana dashboard have not been started yet.*
 - [ ] **6. Fast inference**: ONNX Runtime export + int8 quantization; benchmark
       against PyTorch.
 - [ ] **7. LLM cascade**: send only "needs review" items to an LLM judge; track cost per

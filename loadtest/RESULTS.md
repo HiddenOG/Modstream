@@ -10,7 +10,7 @@ Measured with [`loadgen.py`](loadgen.py). Raw reports are in [`results/`](result
   serving architecture: connections, batching, queueing, fan-out and persistence.
   They do **not** measure transformer inference cost; see "With the ML model" below.
 - **Infrastructure**: in-memory broker and SQLite. The Redis/Postgres deployment
-  is covered by the CI integration job (once pushed to GitHub), not benchmarked here.
+  passes the CI integration tests (real Redis 7 + Postgres 16) but is not benchmarked here.
 - **Windows caveats**: asyncio's IOCP loop is the slowest event-loop backend
   (Linux containers get uvloop), and Windows timers have ~15 ms granularity,
   which inflates small waits such as the 5 ms batching window.

@@ -1,5 +1,7 @@
 # Modstream
 
+[![CI](https://github.com/HiddenOG/Modstream/actions/workflows/ci.yml/badge.svg)](https://github.com/HiddenOG/Modstream/actions/workflows/ci.yml)
+
 **Automatic content moderation for high-volume message streams.** Harassment, hate speech, threats and violent extremism are flagged in milliseconds, with explainable verdicts.
 
 Modstream scores chats, posts and comments with a hybrid pipeline (a curated rule layer plus a BERT toxicity model) and turns the result into product actions: pre-send nudges, content-warning interstitials, a human review queue and a live moderator console. The serving layer is built for **thousands of concurrent streams**: async I/O, dynamic micro-batching, Redis Streams worker pools and per-node fan-out.
