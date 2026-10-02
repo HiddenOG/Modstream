@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block content %}
+
+<section class="hero">
+  <div class="container hero-grid">
+    <div>
+      <span class="eyebrow">Trust &amp; safety, in real time</span>
+      <h1 style="margin-top: 12px">Catch cyberbullying <span class="accent">before it lands.</span></h1>
+      <p class="hero-lead">
+        CyberShield scores every post, comment and message with a hybrid pipeline:
+        a curated rule layer plus a BERT toxicity model. It returns an explainable
+        verdict in milliseconds, so you can nudge, hide or escalate content.
+      </p>
+      <div class="hero-cta row">
+        <a class="btn btn-primary btn-lg" href="{{ url_for('pages.analyze') }}">{{ icon("scan") }}Open the analyzer</a>
+        <a class="btn btn-lg" href="{{ url_for('pages.monitor') }}">{{ icon("activity") }}Live monitor</a>
+      </div>
+      <div class="hero-meta">
+        <span>{{ icon("cpu", "icon-sm") }}{{ engine }}</span>
+        <span>{{ icon("zap", "icon-sm") }}REST + SSE API</span>
+        <span>{{ icon("lock", "icon-sm") }}Analyzer text never stored</span>
+      </div>
+    </div>
+
+    <div class="card card-pad" id="try">
+      <form class="stack" style="--gap: 12px" data-try>
+        <label class="label" for="try-text" style="margin: 0">Try it: type anything</label>
+        <textarea class="textarea" id="try-text" rows="3" maxlength="5000" placeholder="e.g. you're such a loser, nobody likes you" required></textarea>
+        <div class="row spread">
+          <span class="muted small"><kbd>Ctrl</kbd> + <kbd>Enter</kbd></span>
+          <button class="btn btn-primary" type="submit">{{ icon("shield") }}Check</button>
+        </div>
+      </form>
+      <div data-try-result style="margin-top: 18px">
+        <div class="empty small">{{ icon("shield") }}Your verdict appears here, with the exact words that triggered it.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section-sm">
+  <div class="container">
+    <div class="tiles">
+      <div class="card tile"><div class="tile-label">Texts analyzed</div><div class="tile-value">{{ "{:,}".format(stats.scans) }}</div></div>
+      <div class="card tile"><div class="tile-label">Flag rate</div><div class="tile-value">{{ (stats.flag_rate * 100) | round(1) }}<small>%</small></div></div>
+      <div class="card tile"><div class="tile-label">Avg. latency</div><div class="tile-value">{{ stats.avg_latency_ms }}<small>ms</small></div></div>
+      <div class="card tile"><div class="tile-label">Posts &amp; comments</div><div class="tile-value">{{ "{:,}".format(stats.posts + stats.comments) }}</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <span class="eyebrow">How it works</span>
+    <h2 style="margin: 8px 0 24px">Four stages, one explainable verdict</h2>
+    <div class="pipeline">
+      <div class="card step"><h3>Normalize</h3><p>Undo character swaps like <code>1d10t</code> and <code>$tup1d</code> while keeping exact offsets for highlighting.</p></div>
+      <div class="card step"><h3>Rule layer</h3><p>Word-boundary matching against tiered lists: unambiguous slurs and threats, plus context-dependent terms.</p></div>
+      <div class="card step"><h3>Transformer</h3><p>Detoxify (BERT) scores toxicity, insults, threats, obscenity and identity attacks.</p></div>
+      <div class="card step"><h3>Policy</h3><p>Signals combine into <strong>safe</strong>, <strong>needs review</strong> or <strong>flagged</strong>, with reasons attached.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="section" style="padding-top: 0">
+  <div class="container grid grid-2" style="align-items: start">
+    <div class="card card-pad">
+      <h3>What gets caught</h3>
+      <p class="muted small" style="margin: 4px 0 18px">Categories across every non-safe analysis on this instance.</p>
+      {% if stats.categories %}
+      {% set top = stats.categories.values() | max %}
+      <div class="bars">
+        {% for name, count in stats.categories.items() %}
+        <div class="bar-row">
+          <span style="text-transform: capitalize">{{ name }}</span>
+          <div class="meter"><span style="width: {{ (count / top * 100) | round }}%"></span></div>
+          <span class="num">{{ count }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty small">{{ icon("activity") }}No data yet. Analyze a few messages to fill this in.</div>
+      {% endif %}
+    </div>
+    <div class="grid" style="gap: 16px">
+      <a class="card feature" href="{{ url_for('pages.feed') }}">
+        <span class="feature-icon">{{ icon("feed") }}</span>
+        <h3>Sandbox social feed</h3>
+        <p>Post and comment like a real platform. Harmful content is blurred behind a content warning, and authors get a nudge first.</p>
+        <span class="more">Open feed {{ icon("arrow", "icon-sm") }}</span>
+      </a>
+      <a class="card feature" href="{{ url_for('pages.chat') }}">
+        <span class="feature-icon">{{ icon("chat") }}</span>
+        <h3>Chat guard</h3>
+        <p>A DM composer that checks your message while you type and asks "are you sure?" before anything hurtful is sent.</p>
+        <span class="more">Try chat guard {{ icon("arrow", "icon-sm") }}</span>
+      </a>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script type="module">
+  import { analyze, renderResult, h } from "{{ url_for('static', filename='js/core.js') }}";
+  const form = document.querySelector("[data-try]");
+  const field = form.querySelector("textarea");
+  const out = document.querySelector("[data-try-result]");
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = form.querySelector("button");
+    btn.classList.add("is-loading");
+    try {
+      const text = field.value.trim();
+      out.replaceChildren(renderResult(await analyze(text, "home"), text));
+    } catch (err) {
+      out.replaceChildren(h("div", { class: "flash flash-error" }, err.message));
+    } finally {
+      btn.classList.remove("is-loading");
+    }
+  });
+  field.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) form.requestSubmit(); });
+</script>
+{% endblock %}

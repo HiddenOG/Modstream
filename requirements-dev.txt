@@ -1,0 +1,5 @@
+# Lightweight dev/CI install: no PyTorch. Run with CYBERSHIELD_SCORER=none
+# (rules only) or let tests inject a fake scorer.
+flask>=3.0
+pytest>=8.0
+ruff>=0.6

@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}How it works{% endblock %}
+{% block content %}
+<div class="container">
+  <header class="page-head">
+    <span class="eyebrow">Docs</span>
+    <h1 style="margin-top: 8px">How CyberShield works</h1>
+    <p>Architecture, detection policy, the public API and the known limitations.</p>
+  </header>
+
+  <div class="docs section-sm">
+    <nav class="toc" aria-label="On this page">
+      <a href="#architecture">Architecture</a>
+      <a href="#detection">Detection pipeline</a>
+      <a href="#policy">Verdict policy</a>
+      <a href="#api">API reference</a>
+      <a href="#limits">Limitations &amp; ethics</a>
+      <a href="#run">Run it locally</a>
+    </nav>
+
+    <article class="prose" style="min-width: 0">
+      <h2 id="architecture" style="margin-top: 0">Architecture</h2>
+      <p>A Flask application factory with two blueprints: server-rendered pages (which work without JavaScript) and a versioned JSON API that the progressively enhanced UI calls. Both go through one service layer.</p>
+      <div class="arch">
+        <div class="arch-col"><h4>{{ icon("code", "icon-sm") }} Client</h4><ul>
+          <li>Jinja templates + ES modules</li><li>Custom CSS design system</li><li>EventSource (SSE) live feed</li><li>Pre-send nudge dialog</li></ul></div>
+        <div class="arch-col"><h4>{{ icon("zap", "icon-sm") }} Service</h4><ul>
+          <li><code>pages</code> / <code>api</code> blueprints</li><li>Validation &amp; upload sniffing</li><li>Detector (rules + model)</li><li>LRU result cache</li></ul></div>
+        <div class="arch-col"><h4>{{ icon("database", "icon-sm") }} Data</h4><ul>
+          <li>SQLite in WAL mode</li><li>Event outbox → SSE stream</li><li>Metadata-only scan log</li><li>Uploads outside <code>static/</code></li></ul></div>
+      </div>
+
+      <h2 id="detection">Detection pipeline</h2>
+      <ol>
+        <li><strong>Normalization.</strong> A 1:1 character translation undoes common evasions (<code>1d10t → idiot</code>, <code>$tup1d → stupid</code>) without shifting offsets, so matches can be highlighted in the original text.</li>
+        <li><strong>Rule layer.</strong> Word-boundary regexes over a curated, tiered lexicon. <em>Strong</em> terms (slurs, explicit threats, self-harm encouragement) flag on their own. <em>Contextual</em> terms ("stupid", "bomb", names of extremist groups) only send content to review unless the model agrees.</li>
+        <li><strong>Model layer.</strong> <code>{{ engine }}</code>, a BERT model fine-tuned on the Jigsaw toxic comment dataset, scores toxicity, severe toxicity, obscenity, threats, insults and identity attacks. The model sits behind a <code>Scorer</code> protocol, so it can be swapped or mocked in tests. It loads lazily in a background thread, and batch requests are scored in a single forward pass.</li>
+        <li><strong>Policy.</strong> Signals combine into a verdict, a 0–1 risk score, unified categories and human-readable reasons.</li>
+      </ol>
+
+      <h2 id="policy">Verdict policy</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Verdict</th><th>When</th><th>Platform action</th></tr></thead>
+        <tbody>
+          <tr><td><span class="badge badge-flagged">Flagged</span></td><td>Strong term, <em>or</em> model ≥ 0.70, <em>or</em> contextual term + model ≥ 0.40</td><td>Nudge author; blur behind content warning</td></tr>
+          <tr><td><span class="badge badge-review">Needs review</span></td><td>Contextual term alone, <em>or</em> model between 0.40 and 0.70</td><td>Nudge author; label for human review</td></tr>
+          <tr><td><span class="badge badge-safe">Safe</span></td><td>No signals</td><td>Publish normally</td></tr>
+        </tbody>
+      </table></div>
+      <p class="muted small">Thresholds are configurable via the <code>FLAG_THRESHOLD</code> and <code>REVIEW_THRESHOLD</code> environment variables.</p>
+
+      <h2 id="api">API reference</h2>
+      <p>All endpoints live under <code>/api/v1</code> and return JSON. Errors follow one shape: <code>{"error": {"code", "message", "field"}}</code>.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Endpoint</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><span class="method post">POST</span> <code>/analyze</code></td><td>Analyze one text. Body: <code>{"text": "…"}</code></td></tr>
+          <tr><td><span class="method post">POST</span> <code>/analyze/batch</code></td><td>Up to 32 texts in one model pass. Body: <code>{"texts": [...]}</code></td></tr>
+          <tr><td><span class="method">GET</span> <code>/posts</code></td><td>Recent feed posts with comments and analyses</td></tr>
+          <tr><td><span class="method post">POST</span> <code>/posts</code></td><td>Create a post (JSON or multipart with <code>image</code>)</td></tr>
+          <tr><td><span class="method post">POST</span> <code>/posts/:id/comments</code></td><td>Add a comment</td></tr>
+          <tr><td><span class="method post">POST</span> <code>/posts/:id/reactions</code></td><td><code>{"kind": "like" | "share"}</code></td></tr>
+          <tr><td><span class="method">GET</span> <code>/stream</code></td><td>Server-Sent Events of new posts and comments. Resumable via <code>Last-Event-ID</code></td></tr>
+          <tr><td><span class="method">GET</span> <code>/stats</code></td><td>Aggregate counts, flag rate, latency, categories</td></tr>
+          <tr><td><span class="method">GET</span> <code>/health</code></td><td>Liveness, version and model readiness</td></tr>
+        </tbody>
+      </table></div>
+<pre class="code"><code><span class="tok-c"># Analyze a message</span>
+curl -s {{ request.host_url }}api/v1/analyze \
+  -H <span class="tok-s">"Content-Type: application/json"</span> \
+  -d <span class="tok-s">'{"text": "you are such a loser"}'</span></code></pre>
+<p class="muted small">Example response (model scores are illustrative):</p>
+<pre class="code"><code>{
+  <span class="tok-k">"verdict"</span>: <span class="tok-s">"flagged"</span>,
+  <span class="tok-k">"risk"</span>: 0.92,
+  <span class="tok-k">"categories"</span>: [<span class="tok-s">"harassment"</span>, <span class="tok-s">"toxicity"</span>],
+  <span class="tok-k">"reasons"</span>: [<span class="tok-s">"Matched high-severity terms: loser"</span>, <span class="tok-s">"Model scored 'toxicity' at 89%"</span>],
+  <span class="tok-k">"matches"</span>: [{ <span class="tok-k">"term"</span>: <span class="tok-s">"loser"</span>, <span class="tok-k">"category"</span>: <span class="tok-s">"harassment"</span>, <span class="tok-k">"tier"</span>: <span class="tok-s">"strong"</span>, <span class="tok-k">"start"</span>: 15, <span class="tok-k">"end"</span>: 20 }],
+  <span class="tok-k">"model_scores"</span>: { <span class="tok-k">"toxicity"</span>: 0.89, <span class="tok-k">"insult"</span>: 0.71, … },
+  <span class="tok-k">"engine"</span>: <span class="tok-s">"detoxify-original"</span>,
+  <span class="tok-k">"latency_ms"</span>: 38.4
+}</code></pre>
+
+      <h2 id="limits">Limitations &amp; ethics</h2>
+      <ul>
+        <li><strong>Context is hard.</strong> Sarcasm, reclaimed slurs, quotes and news reporting are frequent false positives. That's why ambiguous content goes to <em>review</em> instead of being removed automatically.</li>
+        <li><strong>Known model bias.</strong> Toxicity models trained on Jigsaw data over-flag mentions of some identity groups. Purely religious vocabulary is deliberately left out of the lexicon for the same reason.</li>
+        <li><strong>English-first.</strong> The model and lexicon target English; a few Nigerian Pidgin insults are included in the rules.</li>
+        <li><strong>Privacy.</strong> Analyzer and chat text is never persisted. Only verdict metadata is logged for statistics.</li>
+      </ul>
+
+      <h2 id="run">Run it locally</h2>
+<pre class="code"><code><span class="tok-c"># Full stack with the ML model</span>
+docker compose up --build
+
+<span class="tok-c"># Or with Python 3.10+</span>
+python -m venv .venv &amp;&amp; source .venv/bin/activate
+pip install -r requirements.txt
+python app.py
+
+<span class="tok-c"># Lightweight dev mode (rules only, no PyTorch download)</span>
+pip install -r requirements-dev.txt
+CYBERSHIELD_SCORER=none python app.py
+pytest</code></pre>
+    </article>
+  </div>
+</div>
+{% endblock %}

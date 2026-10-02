@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, verdict_badge, avatar, ago %}
+{% block title %}Feed{% endblock %}
+{% block content %}
+<div class="container">
+  <header class="page-head">
+    <span class="eyebrow">Sandbox feed</span>
+    <h1 style="margin-top: 8px">A social feed with a safety net</h1>
+    <p>Every post and comment is screened. Authors get a nudge before posting something hurtful, and flagged content is blurred behind a warning instead of silently deleted.</p>
+  </header>
+
+  <div class="feed-layout section-sm">
+    <div class="stack">
+      <form class="card card-pad" method="post" action="{{ url_for('pages.create_post') }}" enctype="multipart/form-data" data-composer>
+        <div class="composer-row">
+          <span class="avatar" style="--hue: 240" aria-hidden="true">{{ icon("feed", "icon-sm") }}</span>
+          <div style="flex: 1; min-width: 0">
+            <label class="sr-only" for="post-text">What's on your mind?</label>
+            <textarea class="textarea" id="post-text" name="text" maxlength="5000" placeholder="What's on your mind?" required></textarea>
+            <div class="preview" data-preview hidden>
+              <img alt="Selected image preview">
+              <button class="btn btn-sm btn-icon" type="button" aria-label="Remove image" data-clear-image>{{ icon("x", "icon-sm") }}</button>
+            </div>
+          </div>
+        </div>
+        <div class="composer-tools">
+          <label class="sr-only" for="post-author">Your name</label>
+          <input class="input" id="post-author" name="author" maxlength="40" placeholder="Your name (optional)" autocomplete="nickname">
+          <label class="btn btn-ghost btn-sm file-btn">{{ icon("image") }}Photo
+            <input type="file" name="image" accept="image/png,image/jpeg,image/gif,image/webp" data-image>
+          </label>
+          <button class="btn btn-primary btn-sm" type="submit">{{ icon("send", "icon-sm") }}Post</button>
+        </div>
+      </form>
+
+      {% for post in posts %}
+      <article class="card post" id="post-{{ post.id }}">
+        <div class="cw{% if post.verdict == 'flagged' %} is-hidden{% endif %}">
+          {% if post.verdict == 'flagged' %}
+          <div class="cw-overlay">
+            {{ icon("eye") }}
+            <strong>Content warning</strong>
+            <p>This post may contain {{ post.analysis.categories | join(", ") or "harmful content" }}.</p>
+            <button class="btn btn-sm" type="button" data-reveal>Show anyway</button>
+          </div>
+          {% endif %}
+          <div class="cw-content">
+            <div class="post-head">
+              {{ avatar(post.author) }}
+              <div style="min-width: 0">
+                <div class="post-author">{{ post.author }}</div>
+                <div class="post-time">{{ ago(post.created_at) }}</div>
+              </div>
+              {% if post.verdict != 'safe' %}<span style="margin-left: auto">{{ verdict_badge(post.verdict) }}</span>{% endif %}
+            </div>
+            <div class="post-body">{{ post.body }}</div>
+            {% if post.image %}
+            <div class="post-media"><img src="{{ url_for('pages.upload', name=post.image) }}" alt="Image attached by {{ post.author }}" loading="lazy"></div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="post-actions">
+          <form method="post" action="{{ url_for('pages.react', post_id=post.id) }}" data-react>
+            <input type="hidden" name="kind" value="like">
+            <button class="btn btn-ghost btn-sm" type="submit" aria-label="Like">{{ icon("heart") }}<span data-count>{{ post.likes }}</span></button>
+          </form>
+          <form method="post" action="{{ url_for('pages.react', post_id=post.id) }}" data-react>
+            <input type="hidden" name="kind" value="share">
+            <button class="btn btn-ghost btn-sm" type="submit" aria-label="Share">{{ icon("repeat") }}<span data-count>{{ post.shares }}</span></button>
+          </form>
+          <span class="btn btn-ghost btn-sm" style="pointer-events: none">{{ icon("message") }}{{ post.comments | length }}</span>
+        </div>
+
+        <div class="comments">
+          {% for c in post.comments %}
+          <div class="comment{% if c.verdict == 'flagged' %} is-flagged{% endif %}">
+            {{ avatar(c.author, "avatar-sm") }}
+            <div class="comment-bubble">
+              <strong>{{ c.author }}</strong>
+              {% if c.verdict == 'flagged' %}
+              <span class="comment-hidden">Hidden: flagged as {{ c.analysis.categories | join(", ") or "harmful" }}. <button type="button" data-reveal-comment>Show</button></span>
+              <span class="text" hidden>{{ c.body }}</span>
+              {% else %}
+              <span class="text">{{ c.body }}</span>
+              {% if c.verdict == 'review' %}{{ verdict_badge('review') }}{% endif %}
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+          <form class="comment-form" method="post" action="{{ url_for('pages.add_comment', post_id=post.id) }}" data-comment>
+            <input class="input name" name="author" maxlength="40" placeholder="Name" aria-label="Your name">
+            <input class="input text" name="comment" maxlength="1000" placeholder="Write a comment…" aria-label="Comment" required>
+            <button class="btn btn-primary btn-sm" type="submit" style="height: 38px" aria-label="Send comment">{{ icon("send", "icon-sm") }}</button>
+          </form>
+        </div>
+      </article>
+      {% else %}
+      <div class="card empty">
+        {{ icon("feed") }}
+        <div><strong style="color: var(--text)">No posts yet</strong><br><span class="small">Be the first to post. Try something mean to see the nudge.</span></div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <aside class="feed-aside stack">
+      <div class="card card-pad">
+        <h3>Moderation summary</h3>
+        <div class="tiles" style="grid-template-columns: 1fr 1fr; margin-top: 14px">
+          <div><div class="tile-label">Posts</div><div class="tile-value">{{ stats.posts }}</div></div>
+          <div><div class="tile-label">Flagged</div><div class="tile-value" style="color: var(--flagged)">{{ stats.flagged_posts }}</div></div>
+          <div><div class="tile-label">Comments</div><div class="tile-value">{{ stats.comments }}</div></div>
+          <div><div class="tile-label">Flagged</div><div class="tile-value" style="color: var(--flagged)">{{ stats.flagged_comments }}</div></div>
+        </div>
+        <a class="btn btn-sm" href="{{ url_for('pages.monitor') }}" style="margin-top: 18px; width: 100%">{{ icon("activity", "icon-sm") }}Open live monitor</a>
+      </div>
+      <div class="card card-pad small">
+        <h3 style="font-size: 0.95rem">How this feed protects people</h3>
+        <ul class="reasons muted" style="margin-top: 10px">
+          <li><strong>Pre-send nudge:</strong> authors are asked to reconsider before posting.</li>
+          <li><strong>Interstitials:</strong> flagged posts are blurred, not deleted.</li>
+          <li><strong>Review queue:</strong> ambiguous content is labelled for humans.</li>
+        </ul>
+      </div>
+    </aside>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script type="module">
+  import { api, guardForm } from "{{ url_for('static', filename='js/core.js') }}";
+
+  const composer = document.querySelector("[data-composer]");
+  guardForm(composer, composer.querySelector("textarea"));
+  document.querySelectorAll("[data-comment]").forEach((f) => guardForm(f, f.querySelector("[name=comment]")));
+
+  // Image preview
+  const file = composer.querySelector("[data-image]");
+  const preview = composer.querySelector("[data-preview]");
+  file.addEventListener("change", () => {
+    const [img] = file.files;
+    preview.hidden = !img;
+    if (img) preview.querySelector("img").src = URL.createObjectURL(img);
+  });
+  composer.querySelector("[data-clear-image]").addEventListener("click", () => { file.value = ""; preview.hidden = true; });
+
+  // Content warnings
+  document.querySelectorAll("[data-reveal]").forEach((b) =>
+    b.addEventListener("click", () => b.closest(".cw").classList.remove("is-hidden")));
+  document.querySelectorAll("[data-reveal-comment]").forEach((b) => b.addEventListener("click", () => {
+    const bubble = b.closest(".comment-bubble");
+    bubble.querySelector(".text").hidden = false;
+    bubble.querySelector(".comment-hidden").remove();
+  }));
+
+  // Reactions without a page reload (forms still work with JS disabled)
+  document.querySelectorAll("[data-react]").forEach((form) => form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = form.querySelector("button");
+    const postId = form.closest(".post").id.split("-")[1];
+    const kind = form.elements.kind.value;
+    const counter = btn.querySelector("[data-count]");
+    counter.textContent = Number(counter.textContent) + 1;
+    btn.classList.add("is-active");
+    try {
+      const counts = await api(`/posts/${postId}/reactions`, { method: "POST", body: { kind } });
+      counter.textContent = counts[kind === "like" ? "likes" : "shares"];
+    } catch {
+      counter.textContent = Number(counter.textContent) - 1;
+      btn.classList.remove("is-active");
+    }
+  }));
+</script>
+{% endblock %}

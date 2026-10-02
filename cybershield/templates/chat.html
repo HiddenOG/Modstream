@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, avatar %}
+{% block title %}Chat guard{% endblock %}
+{% block content %}
+<div class="container">
+  <header class="page-head">
+    <span class="eyebrow">Chat guard</span>
+    <h1 style="margin-top: 8px">Think before you send</h1>
+    <p>A messaging composer with a built-in safety check. It scores your draft as you type and asks you to reconsider before anything hurtful is sent. Major platforms use the same "nudge" pattern to reduce harassment.</p>
+  </header>
+
+  <div class="card chat-shell section-sm" style="padding: 0; margin-top: 24px">
+    <aside class="chat-list" aria-label="Conversations">
+      <div class="chat-list-head">Messages</div>
+      <div class="convo is-active">{{ avatar("Jordan") }}<div style="min-width: 0"><div class="convo-name">Jordan</div><div class="convo-last" data-last>did you finish the project?</div></div></div>
+      <div class="convo">{{ avatar("Sam") }}<div style="min-width: 0"><div class="convo-name">Sam</div><div class="convo-last">see you at practice 🏀</div></div></div>
+      <div class="convo">{{ avatar("Priya") }}<div style="min-width: 0"><div class="convo-name">Priya</div><div class="convo-last">lol that meme</div></div></div>
+    </aside>
+
+    <section class="chat-main">
+      <div class="chat-head">
+        {{ avatar("Jordan") }}
+        <div><div style="font-weight: 600">Jordan</div><div class="muted small">Messages are checked by CyberShield</div></div>
+        <span class="badge badge-safe" style="margin-left: auto">{{ icon("shield") }}Guard on</span>
+      </div>
+
+      <div class="chat-thread" data-thread aria-live="polite">
+        <div class="day">Today</div>
+        <div class="msg in"><div class="msg-bubble">hey! did you finish the group project slides?</div></div>
+        <div class="msg in"><div class="msg-bubble">mine are kinda messy ngl 😅</div></div>
+      </div>
+
+      <div class="chat-composer">
+        <form data-chat>
+          <label class="sr-only" for="chat-input">Message</label>
+          <textarea class="textarea" id="chat-input" rows="1" maxlength="1000" placeholder="Message Jordan…" required></textarea>
+          <button class="btn btn-primary" type="submit" aria-label="Send">{{ icon("send") }}</button>
+        </form>
+        <div class="guard-hint" data-hint>{{ icon("shield") }}<span>Your message is checked before it's sent</span></div>
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script type="module">
+  import { analyze, nudge, h, icon } from "{{ url_for('static', filename='js/core.js') }}";
+
+  const form = document.querySelector("[data-chat]");
+  const field = form.querySelector("textarea");
+  const thread = document.querySelector("[data-thread]");
+  const hint = document.querySelector("[data-hint]");
+  const defaultHint = hint.querySelector("span").textContent;
+  let timer;
+
+  function setHint(state, text) {
+    hint.className = `guard-hint ${state}`;
+    hint.querySelector("use").setAttribute("href", state === "safe" ? "#i-check" : state ? "#i-alert" : "#i-shield");
+    hint.querySelector("span").textContent = text;
+  }
+
+  function autosize() {
+    field.style.height = "auto";
+    field.style.height = `${Math.min(field.scrollHeight + 2, 140)}px`;
+  }
+
+  // Debounced live check while typing; not recorded in stats.
+  field.addEventListener("input", () => {
+    autosize();
+    clearTimeout(timer);
+    const text = field.value.trim();
+    if (!text) return setHint("", defaultHint);
+    timer = setTimeout(async () => {
+      try {
+        const result = await analyze(text, "chat", false);
+        if (field.value.trim() !== text) return;
+        const messages = { safe: "Looks good", review: "Heads up: this could be read the wrong way", flagged: "This message may be hurtful" };
+        setHint(result.verdict, messages[result.verdict]);
+      } catch { /* offline: the send-time check still runs */ }
+    }, 450);
+  });
+
+  field.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); }
+  });
+
+  function append(text, result, sentAnyway) {
+    const meta = sentAnyway
+      ? h("span", { class: "msg-meta", style: "color: var(--flagged)" }, icon("alert"), "Sent with warning: hidden from Jordan until they tap to view")
+      : h("span", { class: "msg-meta" }, icon("check"), `Checked · ${result.latency_ms} ms`);
+    thread.append(h("div", { class: `msg out${sentAnyway ? " flagged" : ""}` }, h("div", { class: "msg-bubble" }, text), meta));
+    thread.scrollTop = thread.scrollHeight;
+    document.querySelector("[data-last]").textContent = `You: ${text}`;
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const text = field.value.trim();
+    if (!text) return;
+    const btn = form.querySelector("button");
+    btn.classList.add("is-loading");
+    try {
+      // Record the send-time check (the live checks above are not recorded).
+      const result = await analyze(text, "chat");
+      let sentAnyway = false;
+      if (result.verdict !== "safe") {
+        if ((await nudge(result, text)) !== "send") return field.focus();
+        sentAnyway = result.verdict === "flagged";
+      }
+      append(text, result, sentAnyway);
+      field.value = "";
+      autosize();
+      setHint("", defaultHint);
+    } catch (err) {
+      setHint("flagged", err.message);
+    } finally {
+      btn.classList.remove("is-loading");
+    }
+  });
+</script>
+{% endblock %}

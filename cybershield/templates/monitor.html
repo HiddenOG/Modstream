@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Live monitor{% endblock %}
+{% block content %}
+<div class="container">
+  <header class="page-head row spread" style="align-items: flex-end">
+    <div>
+      <span class="eyebrow">Moderator console</span>
+      <h1 style="margin-top: 8px">Live monitor</h1>
+      <p>New posts and comments from the feed are streamed here over Server-Sent Events the moment they're scored.</p>
+    </div>
+    <span class="status-pill" data-status><span class="dot"></span><span>Connecting…</span></span>
+  </header>
+
+  <section class="section-sm">
+    <div class="tiles">
+      <div class="card tile"><div class="tile-label">Posts</div><div class="tile-value" data-stat="posts">{{ stats.posts }}</div></div>
+      <div class="card tile"><div class="tile-label">Flagged posts</div><div class="tile-value" style="color: var(--flagged)" data-stat="flagged_posts">{{ stats.flagged_posts }}</div></div>
+      <div class="card tile"><div class="tile-label">Comments</div><div class="tile-value" data-stat="comments">{{ stats.comments }}</div></div>
+      <div class="card tile"><div class="tile-label">Flagged comments</div><div class="tile-value" style="color: var(--flagged)" data-stat="flagged_comments">{{ stats.flagged_comments }}</div></div>
+    </div>
+  </section>
+
+  <div class="card">
+    <div class="card-head">
+      <div class="row" style="--gap: 6px" role="group" aria-label="Filter events">
+        <button class="chip" type="button" data-filter="all" aria-pressed="true">All</button>
+        <button class="chip" type="button" data-filter="flagged" aria-pressed="false">Flagged</button>
+        <button class="chip" type="button" data-filter="review" aria-pressed="false">Needs review</button>
+      </div>
+      <button class="btn btn-sm" type="button" data-pause>{{ icon("pause", "icon-sm") }}<span>Pause</span></button>
+    </div>
+    <div class="events" data-events aria-live="polite">
+      <div class="empty" data-empty>
+        {{ icon("activity") }}
+        <div><strong style="color: var(--text)">Waiting for activity</strong><br>
+          <span class="small">Open the <a href="{{ url_for('pages.feed') }}" target="_blank">feed</a> in another tab and post something.</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script type="module">
+  import { api, h, icon, badge, avatar, timeAgo, pct } from "{{ url_for('static', filename='js/core.js') }}";
+
+  const list = document.querySelector("[data-events]");
+  const empty = document.querySelector("[data-empty]");
+  const status = document.querySelector("[data-status]");
+  const pauseBtn = document.querySelector("[data-pause]");
+  let filter = "all";
+  let paused = false;
+  let queued = [];
+
+  function setStatus(state, text) {
+    status.querySelector(".dot").className = `dot ${state}`;
+    status.querySelector("span:last-child").textContent = text;
+  }
+
+  function applyFilter(el) {
+    el.hidden = filter !== "all" && el.dataset.verdict !== filter;
+  }
+
+  function render(type, item, fresh) {
+    const verdict = item.verdict;
+    const el = h("div", { class: `event ${verdict}${fresh ? " is-new" : ""}`, "data-verdict": verdict },
+      h("span", { class: "event-kind", title: type }, icon(type === "post" ? "feed" : "message")),
+      h("div", { style: "min-width:0" },
+        h("div", { class: "row", style: "--gap:8px" },
+          avatar(item.author, "avatar-sm"),
+          h("strong", { class: "small" }, item.author),
+          h("span", { class: "muted small" }, type === "post" ? "posted" : `commented on #${item.post_id}`)),
+        h("div", { class: "event-text" }, item.body),
+        h("div", { class: "event-meta" },
+          badge(verdict),
+          item.analysis.categories.map((c) => h("span", { class: "badge badge-outline" }, c)))),
+      h("div", { class: "event-side" },
+        h("div", {}, `risk ${pct(item.risk)}`),
+        h("time", { datetime: item.created_at, "data-ago": "" }, timeAgo(item.created_at))),
+    );
+    applyFilter(el);
+    empty.remove();
+    list.prepend(el);
+    while (list.children.length > 200) list.lastElementChild.remove();
+  }
+
+  let statsTimer;
+  function refreshStats() {
+    clearTimeout(statsTimer);
+    statsTimer = setTimeout(async () => {
+      const stats = await api("/stats").catch(() => null);
+      if (!stats) return;
+      document.querySelectorAll("[data-stat]").forEach((el) => { el.textContent = stats[el.dataset.stat]; });
+    }, 400);
+  }
+
+  let firstBatch = true;
+  const source = new EventSource("{{ url_for('api.stream') }}");
+  source.addEventListener("open", () => { setStatus("live", "Live"); setTimeout(() => { firstBatch = false; }, 1500); });
+  source.addEventListener("error", () => setStatus("down", "Reconnecting…"));
+  for (const type of ["post", "comment"]) {
+    source.addEventListener(type, (e) => {
+      const item = JSON.parse(e.data);
+      if (paused) { queued.push([type, item]); pauseBtn.querySelector("span").textContent = `Resume (${queued.length})`; return; }
+      render(type, item, !firstBatch);
+      if (!firstBatch) refreshStats();
+    });
+  }
+
+  document.querySelectorAll("[data-filter]").forEach((chip) => chip.addEventListener("click", () => {
+    filter = chip.dataset.filter;
+    document.querySelectorAll("[data-filter]").forEach((c) => c.setAttribute("aria-pressed", String(c === chip)));
+    list.querySelectorAll(".event").forEach(applyFilter);
+  }));
+
+  pauseBtn.addEventListener("click", () => {
+    paused = !paused;
+    pauseBtn.querySelector("use").setAttribute("href", paused ? "#i-play" : "#i-pause");
+    pauseBtn.querySelector("span").textContent = paused ? "Resume" : "Pause";
+    if (!paused) { queued.forEach(([t, i]) => render(t, i, true)); queued = []; refreshStats(); }
+  });
+</script>
+{% endblock %}

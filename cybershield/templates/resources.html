@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Get help{% endblock %}
+{% block content %}
+<div class="container container-narrow">
+  <header class="page-head">
+    <span class="eyebrow">Safety resources</span>
+    <h1 style="margin-top: 8px">If you're being targeted online</h1>
+    <p>What to do when you see or receive cyberbullying, hate speech or violent threats. You don't have to handle it alone.</p>
+  </header>
+
+  <div class="callout section-sm" style="margin-top: 24px" role="note">
+    {{ icon("alert", "icon-lg") }}
+    <div>
+      <strong>In immediate danger?</strong>
+      <p class="small" style="margin-top: 4px">If someone threatens violence or terrorism, or you're worried about your safety or someone else's, contact your local emergency services right away. Never confront dangerous users directly.</p>
+    </div>
+  </div>
+
+  <div class="stack" style="margin-top: 24px">
+    <div class="card step-card">
+      <span class="step-num">01</span>
+      <div><h3>Don't engage</h3>
+        <ul><li>Don't reply aggressively. That's often what the sender wants.</li><li>Step away from the screen if you need to. Your wellbeing comes first.</li></ul></div>
+    </div>
+    <div class="card step-card">
+      <span class="step-num">02</span>
+      <div><h3>Document everything</h3>
+        <ul><li>Screenshot messages, including usernames, dates and times.</li><li>Save links to posts before they're edited or deleted.</li></ul></div>
+    </div>
+    <div class="card step-card">
+      <span class="step-num">03</span>
+      <div><h3>Report it</h3>
+        <ul><li>Use the platform's built-in report tools. Most act faster on reports that include evidence.</li><li>Report threats and extremist content to the authorities, not just the platform.</li><li>If you see someone else being targeted, report it too.</li></ul></div>
+    </div>
+    <div class="card step-card">
+      <span class="step-num">04</span>
+      <div><h3>Block and lock down</h3>
+        <ul><li>Block or mute repeat offenders.</li><li>Review privacy settings: who can message you, comment or tag you.</li></ul></div>
+    </div>
+    <div class="card step-card">
+      <span class="step-num">05</span>
+      <div><h3>Talk to someone</h3>
+        <ul><li>Reach out to a friend, family member, teacher or counsellor you trust.</li><li>Many countries have free, confidential helplines for young people and for victims of online abuse.</li></ul></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
