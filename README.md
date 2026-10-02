@@ -59,12 +59,21 @@ Modstream scores chats, posts and comments with a hybrid pipeline (a curated rul
 **Zero infrastructure** (in-memory broker, SQLite, embedded worker):
 
 ```bash
-python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -r requirements-dev.txt                  # no PyTorch
-MODSTREAM_SCORER=none python -m modstream api             # http://127.0.0.1:8000  · API docs at /docs
+# macOS / Linux
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements-dev.txt                 # no PyTorch
+MODSTREAM_SCORER=none python -m modstream api       # http://127.0.0.1:8000 · API docs at /docs
 ```
 
-Install `requirements.txt` instead to add the Detoxify model.
+```powershell
+# Windows (PowerShell)
+python -m venv .venv; .venv\Scripts\activate
+pip install -r requirements-dev.txt
+$env:MODSTREAM_SCORER = "none"; python -m modstream api
+```
+
+Install `requirements.txt` instead to add the Detoxify model. To check a running instance end to end
+(pages, uploads, live stream, queue, WebSocket), run `python scripts/smoke.py [base-url]`.
 
 **Full stack** (API, worker pool, Redis, Postgres, Prometheus, Grafana):
 
