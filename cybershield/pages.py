@@ -2,109 +2,149 @@
 
 from __future__ import annotations
 
-from flask import (
-    Blueprint,
-    current_app,
-    flash,
-    redirect,
-    render_template,
-    request,
-    send_from_directory,
-    url_for,
-)
+from pathlib import Path
 
-from . import db as store
-from . import services
+from fastapi import APIRouter, File, Form, Request, UploadFile
+from fastapi.responses import RedirectResponse
+from fastapi.templating import Jinja2Templates
+from jinja2 import pass_context
+from pydantic import ValidationError
 
-bp = Blueprint("pages", __name__)
+from . import __version__
+from .schemas import CommentIn, PostIn, ReactionIn
+from .services import Runtime, ServiceError
 
-
-@bp.get("/")
-def home():
-    return render_template("index.html", stats=store.stats(store.get_db()))
+router = APIRouter(include_in_schema=False)
+templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
 
-@bp.get("/analyze")
-def analyze():
-    return render_template("analyze.html")
+@pass_context
+def _url_for(ctx, name: str, **params) -> str:
+    """Flask-style url_for returning a relative path (works behind any proxy)."""
+    if "filename" in params:
+        params["path"] = params.pop("filename")
+    return str(ctx["request"].app.url_path_for(name, **params))
 
 
-@bp.get("/feed")
-def feed():
-    conn = store.get_db()
-    return render_template("feed.html", posts=store.list_posts(conn), stats=store.stats(conn))
+@pass_context
+def _get_flashed_messages(ctx, with_categories: bool = False):
+    messages = ctx["request"].session.pop("_flashes", [])
+    return [tuple(m) for m in messages] if with_categories else [m[1] for m in messages]
 
 
-@bp.post("/feed")
-def create_post():
+templates.env.globals.update(url_for=_url_for, get_flashed_messages=_get_flashed_messages)
+templates.env.filters["hue"] = lambda name: sum(map(ord, name)) % 360
+
+
+def flash(request: Request, message: str, category: str = "info") -> None:
+    request.session.setdefault("_flashes", []).append([category, message])
+
+
+def render(request: Request, template: str, status_code: int = 200, **context):
+    rt: Runtime = request.app.state.rt
+    route = request.scope.get("route")
+    context.update(endpoint=getattr(route, "name", None), app_version=__version__, engine=rt.detector.engine)
+    return templates.TemplateResponse(request, template, context, status_code=status_code)
+
+
+def back_to_feed(post_id: int | None = None) -> RedirectResponse:
+    return RedirectResponse(f"/feed#post-{post_id}" if post_id else "/feed", status_code=303)
+
+
+def _first_error(exc: ValidationError) -> str:
+    err = exc.errors()[0]
+    return f"{err['loc'][-1]}: {err['msg']}".capitalize()
+
+
+@router.get("/", name="pages.home")
+async def home(request: Request):
+    return render(request, "index.html", stats=await request.app.state.rt.stats())
+
+
+@router.get("/analyze", name="pages.analyze")
+async def analyze(request: Request):
+    return render(request, "analyze.html")
+
+
+@router.get("/feed", name="pages.feed")
+async def feed(request: Request):
+    rt: Runtime = request.app.state.rt
+    return render(request, "feed.html", posts=await rt.list_posts(), stats=await rt.stats())
+
+
+@router.post("/feed", name="pages.create_post")
+async def create_post(
+    request: Request,
+    text: str = Form(""),
+    author: str = Form(""),
+    image: UploadFile | None = File(None),
+):
+    rt: Runtime = request.app.state.rt
     try:
-        post = services.create_post(
-            request.form.get("author"), request.form.get("text"), request.files.get("image")
-        )
-    except services.ValidationError as err:
-        flash(err.message, "error")
-        return redirect(url_for(".feed"))
+        body = PostIn(author=author, text=text)
+        post = await rt.create_post(body.author, body.text, image)
+    except ValidationError as exc:
+        flash(request, _first_error(exc), "error")
+        return back_to_feed()
+    except ServiceError as exc:
+        flash(request, exc.message, "error")
+        return back_to_feed()
     if post["verdict"] == "flagged":
-        flash("Your post was published but hidden behind a content warning.", "warning")
-    return redirect(url_for(".feed", _anchor=f"post-{post['id']}"))
+        flash(request, "Your post was published but hidden behind a content warning.", "warning")
+    return back_to_feed(post["id"])
 
 
-@bp.post("/feed/<int:post_id>/comments")
-def add_comment(post_id: int):
+@router.post("/feed/{post_id}/comments", name="pages.add_comment")
+async def add_comment(request: Request, post_id: int, comment: str = Form(""), author: str = Form("")):
     try:
-        services.add_comment(post_id, request.form.get("author"), request.form.get("comment"))
-    except services.ValidationError as err:
-        flash(err.message, "error")
-    return redirect(url_for(".feed", _anchor=f"post-{post_id}"))
+        body = CommentIn(author=author, text=comment)
+        await request.app.state.rt.add_comment(post_id, body.author, body.text)
+    except ValidationError as exc:
+        flash(request, _first_error(exc), "error")
+    except ServiceError as exc:
+        flash(request, exc.message, "error")
+    return back_to_feed(post_id)
 
 
-@bp.post("/feed/<int:post_id>/react")
-def react(post_id: int):
+@router.post("/feed/{post_id}/react", name="pages.react")
+async def react(request: Request, post_id: int, kind: str = Form("")):
     try:
-        services.react(post_id, request.form.get("kind"))
-    except services.ValidationError as err:
-        flash(err.message, "error")
-    return redirect(url_for(".feed", _anchor=f"post-{post_id}"))
+        await request.app.state.rt.react(post_id, ReactionIn(kind=kind).kind)
+    except (ValidationError, ServiceError):
+        flash(request, "Couldn't save that reaction.", "error")
+    return back_to_feed(post_id)
 
 
-@bp.get("/monitor")
-def monitor():
-    return render_template("monitor.html", stats=store.stats(store.get_db()))
+@router.get("/monitor", name="pages.monitor")
+async def monitor(request: Request):
+    return render(request, "monitor.html", stats=await request.app.state.rt.stats())
 
 
-@bp.get("/chat")
-def chat():
-    return render_template("chat.html")
+@router.get("/chat", name="pages.chat")
+async def chat(request: Request):
+    return render(request, "chat.html")
 
 
-@bp.get("/resources")
-def resources():
-    return render_template("resources.html")
+@router.get("/resources", name="pages.resources")
+async def resources(request: Request):
+    return render(request, "resources.html")
 
 
-@bp.get("/about")
-def about():
-    return render_template("about.html", engine=services.detector().engine)
+@router.get("/about", name="pages.about")
+async def about(request: Request):
+    return render(request, "about.html")
 
 
-@bp.get("/uploads/<path:name>")
-def upload(name: str):
-    return send_from_directory(current_app.config["UPLOAD_FOLDER"], name)
+# Old URLs from v1 keep working.
+LEGACY = {"/paste": "/analyze", "/facebook": "/feed", "/facebook/live": "/monitor",
+          "/chatbot": "/chat", "/actions": "/resources", "/help": "/about"}
 
 
-# Old URLs from v1 of the app keep working.
-LEGACY = {
-    "/paste": ".analyze",
-    "/facebook": ".feed",
-    "/facebook/live": ".monitor",
-    "/chatbot": ".chat",
-    "/actions": ".resources",
-    "/help": ".about",
-}
+def _redirect(target: str):
+    async def endpoint():
+        return RedirectResponse(target, status_code=301)
+    return endpoint
 
-for _path, _endpoint in LEGACY.items():
-    bp.add_url_rule(
-        _path,
-        f"legacy_{_endpoint[1:]}",
-        lambda endpoint=_endpoint: redirect(url_for(endpoint), 301),
-    )
+
+for _old, _new in LEGACY.items():
+    router.add_api_route(_old, _redirect(_new), methods=["GET"], name=f"legacy{_old.replace('/', '.')}")

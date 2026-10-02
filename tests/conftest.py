@@ -1,7 +1,14 @@
+import asyncio
+import os
+
 import pytest
+from fastapi.testclient import TestClient
 
 from cybershield import create_app
+from cybershield.config import Settings
+from cybershield.db import Base, make_engine
 from cybershield.detector import Detector
+from cybershield.services import Runtime
 
 
 class FakeScorer:
@@ -12,9 +19,11 @@ class FakeScorer:
 
     def __init__(self):
         self.calls = 0
+        self.batch_sizes = []
 
     def score(self, texts):
         self.calls += 1
+        self.batch_sizes.append(len(texts))
         out = []
         for t in texts:
             if "TOXIC" in t:
@@ -36,19 +45,45 @@ def detector(scorer):
     return Detector(scorer)
 
 
-@pytest.fixture
-def app(tmp_path, detector):
-    return create_app({
-        "TESTING": True,
-        "SECRET_KEY": "test",
-        "DATABASE": str(tmp_path / "test.db"),
-        "UPLOAD_FOLDER": str(tmp_path / "uploads"),
-        "DETECTOR": detector,
-        "STREAM_MAX_SECONDS": 0,
-        "STREAM_POLL_SECONDS": 0,
-    })
+def _database_url(tmp_path) -> str:
+    url = os.environ.get("CS_TEST_DATABASE_URL")  # real Postgres in CI
+    if url:
+        async def reset():
+            engine = make_engine(url)
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.drop_all)
+            await engine.dispose()
+
+        asyncio.run(reset())
+        return url
+    return f"sqlite+aiosqlite:///{(tmp_path / 'test.db').as_posix()}"
 
 
 @pytest.fixture
-def client(app):
-    return app.test_client()
+def settings(tmp_path):
+    return Settings(
+        env="test",
+        secret_key="test",
+        database_url=_database_url(tmp_path),
+        redis_url=None,
+        upload_dir=str(tmp_path / "uploads"),
+        warmup=False,
+        batch_max_wait_ms=2,
+        worker_block_ms=50,
+        stream_max_seconds=0.3,
+        stream_heartbeat_s=0.1,
+    )
+
+
+@pytest.fixture
+def client(settings, detector):
+    with TestClient(create_app(settings, detector=detector)) as c:
+        yield c
+
+
+@pytest.fixture
+async def runtime(settings, detector):
+    rt = Runtime(settings, detector=detector)
+    await rt.start(workers=0)
+    yield rt
+    await rt.stop()

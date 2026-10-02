@@ -36,8 +36,8 @@
         CyberShield
       </a>
       <nav class="nav" id="site-nav" aria-label="Main">
-        {% for endpoint, label, ic in nav %}
-        <a href="{{ url_for(endpoint) }}" {% if request.endpoint == endpoint %}aria-current="page"{% endif %}>{{ icon(ic) }}{{ label }}</a>
+        {% for ep, label, ic in nav %}
+        <a href="{{ url_for(ep) }}" {% if endpoint == ep %}aria-current="page"{% endif %}>{{ icon(ic) }}{{ label }}</a>
         {% endfor %}
       </nav>
       <div class="header-actions">
