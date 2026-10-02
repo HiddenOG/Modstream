@@ -2,13 +2,13 @@
 
 Three responsibilities:
 
-* **Work queue** (``cs:messages``): durable, at-least-once delivery to a
+* **Work queue** (``modstream:messages``): durable, at-least-once delivery to a
   consumer group of workers. Crashed workers' messages are reclaimed after an
   idle timeout, and poison messages go to a dead-letter stream.
-* **Event log** (``cs:events``): a capped, ordered log of moderation results.
+* **Event log** (``modstream:events``): a capped, ordered log of moderation results.
   Every API node tails it once and fans out to its local subscribers. Clients
   resume after a disconnect by event id.
-* **Counters** (``cs:stats``): atomic counters for dashboards, replacing
+* **Counters** (``modstream:stats``): atomic counters for dashboards, replacing
   aggregate SQL queries.
 
 ``RedisBroker`` is the production implementation (Redis Streams).
@@ -28,10 +28,10 @@ from dataclasses import dataclass, field
 
 Entry = tuple[str, dict]
 
-MESSAGES = "cs:messages"
-EVENTS = "cs:events"
-DLQ = "cs:dlq"
-STATS = "cs:stats"
+MESSAGES = "modstream:messages"
+EVENTS = "modstream:events"
+DLQ = "modstream:dlq"
+STATS = "modstream:stats"
 GROUP = "moderators"
 
 

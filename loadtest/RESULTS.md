@@ -6,7 +6,7 @@ Measured with [`loadgen.py`](loadgen.py). Raw reports are in [`results/`](result
 
 - **Machine**: one 8-core Windows 11 laptop running **both** the server and the
   load generator, so they compete for the same cores.
-- **Detector**: rules-only mode (`CS_SCORER=none`). These runs measure the
+- **Detector**: rules-only mode (`MODSTREAM_SCORER=none`). These runs measure the
   serving architecture: connections, batching, queueing, fan-out and persistence.
   They do **not** measure transformer inference cost; see "With the ML model" below.
 - **Infrastructure**: in-memory broker and SQLite. The Redis/Postgres deployment
@@ -73,11 +73,11 @@ Next measurement to add: per-batch inference latency on CPU vs ONNX vs GPU.
 
 ```bash
 # terminal 1: server (rules-only, 4 processes)
-CS_SECRET_KEY=dev CS_SCORER=none python -m cybershield api --workers 4
+MODSTREAM_SECRET_KEY=dev MODSTREAM_SCORER=none python -m modstream api --workers 4
 # terminal 2
 python loadtest/loadgen.py analyze --streams 2000 --rate 4 --duration 20 --procs 4
 ```
 
 The pipeline mode with the in-memory broker needs a single server process
-(`--workers 1`); with `CS_REDIS_URL` set, any number of API and worker processes
+(`--workers 1`); with `MODSTREAM_REDIS_URL` set, any number of API and worker processes
 share one queue.

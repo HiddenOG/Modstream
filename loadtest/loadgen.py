@@ -1,4 +1,4 @@
-"""Load generator: many concurrent message streams against a CyberShield node.
+"""Load generator: many concurrent message streams against a Modstream node.
 
 Modes
 -----

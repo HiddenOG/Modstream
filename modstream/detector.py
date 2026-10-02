@@ -132,7 +132,7 @@ def load_scorer(kind: str = "auto") -> Scorer:
         if importlib.util.find_spec("detoxify") is not None:
             return DetoxifyScorer()
         if kind == "detoxify":
-            raise RuntimeError("CYBERSHIELD_SCORER=detoxify but detoxify is not installed")
+            raise RuntimeError("MODSTREAM_SCORER=detoxify but detoxify is not installed")
         log.warning("detoxify not installed; running in lexicon-only mode")
         return NullScorer()
     raise ValueError(f"Unknown scorer: {kind!r}")

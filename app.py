@@ -1,6 +1,6 @@
 """ASGI entry point: `uvicorn app:app`, or `python app.py` for local development."""
 
-from cybershield import create_app
+from modstream import create_app
 
 app = create_app()
 

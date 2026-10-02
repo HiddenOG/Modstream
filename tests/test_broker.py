@@ -3,7 +3,7 @@ import os
 
 import pytest
 
-from cybershield.broker import MemoryBroker, RedisBroker
+from modstream.broker import MemoryBroker, RedisBroker
 
 
 @pytest.fixture(params=["memory", "redis"])
@@ -11,7 +11,7 @@ async def broker(request):
     if request.param == "memory":
         b = MemoryBroker(events_maxlen=100)
     else:
-        url = os.environ.get("CS_TEST_REDIS_URL")
+        url = os.environ.get("MODSTREAM_TEST_REDIS_URL")
         if url:  # real Redis in CI
             b = RedisBroker.from_url(url, events_maxlen=100)
             await b.r.flushdb()
@@ -42,7 +42,7 @@ async def test_consume_times_out_when_empty(broker):
 
 
 async def test_consume_wakes_on_new_work(broker):
-    if isinstance(broker, RedisBroker) and not os.environ.get("CS_TEST_REDIS_URL"):
+    if isinstance(broker, RedisBroker) and not os.environ.get("MODSTREAM_TEST_REDIS_URL"):
         pytest.skip("fakeredis doesn't wake a blocked XREADGROUP; covered against real Redis in CI")
     task = asyncio.create_task(broker.consume("w1", count=10, block_ms=2000))
     await asyncio.sleep(0.05)

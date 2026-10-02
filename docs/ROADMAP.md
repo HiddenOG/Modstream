@@ -19,13 +19,13 @@ infrastructure that scales horizontally and can be measured.
                                    │  sync path:  /analyze, WS frames ─► MicroBatcher ─► model
                                    │  async path: /messages ─► XADD ──┐
                                    │                                  ▼
-                                   │                 Redis Stream  cs:messages
+                                   │                 Redis Stream  modstream:messages
                                    │                 (consumer group, at-least-once)
                                    │                                  │
                                    │              workers (N replicas): batch read → model
                                    │              → bulk insert → publish → XACK  (DLQ on failure)
                                    │                                  │
- viewers ◄──SSE / WebSocket── Hub ◄──── Redis Stream  cs:events ◄─────┘
+ viewers ◄──SSE / WebSocket── Hub ◄─ Redis Stream  modstream:events ◄─┘
                                    │
                          Postgres (SQLAlchemy async) · Redis counters for stats
                          Prometheus /metrics → Grafana

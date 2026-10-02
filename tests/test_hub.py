@@ -1,7 +1,7 @@
 import asyncio
 
-from cybershield.broker import MemoryBroker
-from cybershield.hub import Hub, make_filter
+from modstream.broker import MemoryBroker
+from modstream.hub import Hub, make_filter
 
 
 def event(channel, verdict):

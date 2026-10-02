@@ -1,10 +1,10 @@
 """Command line entry points.
 
-    python -m cybershield api     [--host 0.0.0.0] [--port 8000] [--reload]
-    python -m cybershield worker  [--concurrency 2] [--metrics-port 9100]
+    python -m modstream api     [--host 0.0.0.0] [--port 8000] [--reload]
+    python -m modstream worker  [--concurrency 2] [--metrics-port 9100]
 
 Production runs one process per container and scales by adding replicas:
-API nodes with ``CS_RUN_WORKER=false`` and a separate pool of workers.
+API nodes with ``MODSTREAM_RUN_WORKER=false`` and a separate pool of workers.
 """
 
 from __future__ import annotations
@@ -54,7 +54,7 @@ async def run_worker(args) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(prog="cybershield")
+    parser = argparse.ArgumentParser(prog="modstream")
     sub = parser.add_subparsers(dest="command", required=True)
     api = sub.add_parser("api", help="run the HTTP/WebSocket API")
     api.add_argument("--host", default="127.0.0.1")

@@ -1,6 +1,6 @@
 import pytest
 
-from cybershield.detector import Detector, NullScorer, find_matches
+from modstream.detector import Detector, NullScorer, find_matches
 
 
 def terms(text):

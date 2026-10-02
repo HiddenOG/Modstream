@@ -100,9 +100,9 @@ def create_app(
         await rt.stop()
 
     app = FastAPI(
-        title="CyberShield API",
+        title="Modstream API",
         version=__version__,
-        description="Real-time harmful content detection for posts, chats and high-volume message streams.",
+        description="Real-time content moderation for posts, chats and high-volume message streams.",
         lifespan=lifespan,
         redoc_url=None,
     )

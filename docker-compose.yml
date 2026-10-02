@@ -6,11 +6,11 @@
 x-app: &app
   build: .
   environment: &app-env
-    CS_ENV: prod
-    CS_SECRET_KEY: ${CS_SECRET_KEY:-change-me-in-production}
-    CS_DATABASE_URL: postgresql+asyncpg://cybershield:cybershield@postgres:5432/cybershield
-    CS_REDIS_URL: redis://redis:6379/0
-    CS_LOG_JSON: "true"
+    MODSTREAM_ENV: prod
+    MODSTREAM_SECRET_KEY: ${MODSTREAM_SECRET_KEY:-change-me-in-production}
+    MODSTREAM_DATABASE_URL: postgresql+asyncpg://modstream:modstream@postgres:5432/modstream
+    MODSTREAM_REDIS_URL: redis://redis:6379/0
+    MODSTREAM_LOG_JSON: "true"
   depends_on:
     redis: { condition: service_healthy }
     postgres: { condition: service_healthy }
@@ -21,16 +21,16 @@ services:
     <<: *app
     environment:
       <<: *app-env
-      CS_RUN_WORKER: "false"        # workers run in their own service
+      MODSTREAM_RUN_WORKER: "false"        # workers run in their own service
     ports: ["8000:8000"]
     volumes: [uploads:/app/instance/uploads]
 
   worker:
     <<: *app
-    command: ["python", "-m", "cybershield", "worker", "--concurrency", "1", "--metrics-port", "9100"]
+    command: ["python", "-m", "modstream", "worker", "--concurrency", "1", "--metrics-port", "9100"]
     environment:
       <<: *app-env
-      CS_WARMUP: "true"
+      MODSTREAM_WARMUP: "true"
     deploy:
       replicas: 2
 
@@ -46,12 +46,12 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: cybershield
-      POSTGRES_PASSWORD: cybershield
-      POSTGRES_DB: cybershield
+      POSTGRES_USER: modstream
+      POSTGRES_PASSWORD: modstream
+      POSTGRES_DB: modstream
     volumes: [postgres:/var/lib/postgresql/data]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U cybershield"]
+      test: ["CMD-SHELL", "pg_isready -U modstream"]
       interval: 5s
       retries: 10
 
@@ -65,7 +65,7 @@ services:
     environment:
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
-      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/cybershield.json
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/modstream.json
     volumes:
       - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
