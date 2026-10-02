@@ -3,7 +3,7 @@ import time
 
 from fastapi.testclient import TestClient
 
-from cybershield import create_app
+from modstream import create_app
 
 
 def sse_events(body: str) -> list[tuple[str, str, dict]]:
@@ -42,8 +42,8 @@ def test_openapi_docs(client):
 def test_metrics_endpoint(client):
     client.post("/api/v1/analyze", json={"text": "hello"})
     body = client.get("/metrics/").text
-    assert "cs_inference_batch_size" in body
-    assert 'cs_http_requests_total{method="POST",route="/api/v1/analyze",status="200"}' in body
+    assert "modstream_inference_batch_size" in body
+    assert 'modstream_http_requests_total{method="POST",route="/api/v1/analyze",status="200"}' in body
 
 
 # --- synchronous detection ---

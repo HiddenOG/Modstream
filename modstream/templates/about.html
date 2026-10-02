@@ -5,7 +5,7 @@
 <div class="container">
   <header class="page-head">
     <span class="eyebrow">Docs</span>
-    <h1 style="margin-top: 8px">How CyberShield works</h1>
+    <h1 style="margin-top: 8px">How Modstream works</h1>
     <p>Architecture, detection policy, the public API and the known limitations.</p>
   </header>
 
@@ -101,7 +101,7 @@ docker compose up --scale worker=4
 
 <span class="tok-c"># Zero infrastructure (in-memory broker, SQLite, rules only)</span>
 pip install -r requirements-dev.txt
-CS_SCORER=none python -m cybershield api
+MODSTREAM_SCORER=none python -m modstream api
 
 <span class="tok-c"># Tests and a 1,000-stream load test</span>
 pytest

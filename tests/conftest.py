@@ -4,11 +4,11 @@ import os
 import pytest
 from fastapi.testclient import TestClient
 
-from cybershield import create_app
-from cybershield.config import Settings
-from cybershield.db import Base, make_engine
-from cybershield.detector import Detector
-from cybershield.services import Runtime
+from modstream import create_app
+from modstream.config import Settings
+from modstream.db import Base, make_engine
+from modstream.detector import Detector
+from modstream.services import Runtime
 
 
 class FakeScorer:
@@ -46,7 +46,7 @@ def detector(scorer):
 
 
 def _database_url(tmp_path) -> str:
-    url = os.environ.get("CS_TEST_DATABASE_URL")  # real Postgres in CI
+    url = os.environ.get("MODSTREAM_TEST_DATABASE_URL")  # real Postgres in CI
     if url:
         async def reset():
             engine = make_engine(url)
@@ -60,7 +60,7 @@ def _database_url(tmp_path) -> str:
 
 
 def _redis_url() -> str | None:
-    url = os.environ.get("CS_TEST_REDIS_URL")  # real Redis in CI
+    url = os.environ.get("MODSTREAM_TEST_REDIS_URL")  # real Redis in CI
     if url:
         import redis
 

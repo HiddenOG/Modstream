@@ -1,7 +1,7 @@
 [project]
-name = "cybershield"
+name = "modstream"
 version = "3.0.0"
-description = "Real-time cyberbullying, hate speech and extremism detection for message streams"
+description = "Real-time automatic content moderation for high-volume message streams"
 requires-python = ">=3.11"
 
 [tool.pytest.ini_options]

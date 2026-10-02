@@ -2,9 +2,9 @@ import asyncio
 import contextlib
 import time
 
-from cybershield import db
-from cybershield.schemas import MessageIn
-from cybershield.worker import Worker
+from modstream import db
+from modstream.schemas import MessageIn
+from modstream.worker import Worker
 
 
 async def messages(rt):

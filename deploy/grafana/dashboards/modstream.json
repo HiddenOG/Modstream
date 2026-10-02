@@ -1,6 +1,6 @@
 {
-  "uid": "cybershield",
-  "title": "CyberShield: streaming moderation",
+  "uid": "modstream",
+  "title": "Modstream: streaming moderation",
   "schemaVersion": 39,
   "version": 1,
   "refresh": "5s",
@@ -9,7 +9,7 @@
     "to": "now"
   },
   "tags": [
-    "cybershield"
+    "modstream"
   ],
   "panels": [
     {
@@ -52,7 +52,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (verdict) (rate(cs_analyses_total[1m]))",
+          "expr": "sum by (verdict) (rate(modstream_analyses_total[1m]))",
           "legendFormat": "{{verdict}}"
         }
       ]
@@ -97,7 +97,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.5, sum by (le) (rate(cs_stream_end_to_end_seconds_bucket[1m])))",
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(modstream_stream_end_to_end_seconds_bucket[1m])))",
           "legendFormat": "p50"
         },
         {
@@ -106,7 +106,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(cs_stream_end_to_end_seconds_bucket[1m])))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(modstream_stream_end_to_end_seconds_bucket[1m])))",
           "legendFormat": "p95"
         },
         {
@@ -115,7 +115,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.99, sum by (le) (rate(cs_stream_end_to_end_seconds_bucket[1m])))",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(modstream_stream_end_to_end_seconds_bucket[1m])))",
           "legendFormat": "p99"
         }
       ]
@@ -160,7 +160,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "max(cs_stream_lag)",
+          "expr": "max(modstream_stream_lag)",
           "legendFormat": "lag (unread)"
         },
         {
@@ -169,7 +169,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "max(cs_stream_pending)",
+          "expr": "max(modstream_stream_pending)",
           "legendFormat": "pending (unacked)"
         }
       ]
@@ -214,7 +214,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(cs_inference_batch_size_sum[1m])) / sum(rate(cs_inference_batch_size_count[1m]))",
+          "expr": "sum(rate(modstream_inference_batch_size_sum[1m])) / sum(rate(modstream_inference_batch_size_count[1m]))",
           "legendFormat": "avg batch"
         }
       ]
@@ -259,7 +259,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.5, sum by (le) (rate(cs_inference_duration_seconds_bucket[1m])))",
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(modstream_inference_duration_seconds_bucket[1m])))",
           "legendFormat": "p50"
         },
         {
@@ -268,7 +268,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.99, sum by (le) (rate(cs_inference_duration_seconds_bucket[1m])))",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(modstream_inference_duration_seconds_bucket[1m])))",
           "legendFormat": "p99"
         }
       ]
@@ -313,7 +313,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.95, sum by (le, route) (rate(cs_http_request_duration_seconds_bucket[1m])))",
+          "expr": "histogram_quantile(0.95, sum by (le, route) (rate(modstream_http_request_duration_seconds_bucket[1m])))",
           "legendFormat": "{{route}}"
         }
       ]
@@ -358,7 +358,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (transport) (cs_subscribers)",
+          "expr": "sum by (transport) (modstream_subscribers)",
           "legendFormat": "{{transport}}"
         }
       ]
@@ -403,7 +403,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(cs_stream_reclaimed_total[1m]))",
+          "expr": "sum(rate(modstream_stream_reclaimed_total[1m]))",
           "legendFormat": "reclaimed"
         },
         {
@@ -412,7 +412,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(cs_stream_dead_lettered_total[1m]))",
+          "expr": "sum(rate(modstream_stream_dead_lettered_total[1m]))",
           "legendFormat": "dead-lettered"
         },
         {
@@ -421,7 +421,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(cs_batcher_rejected_total[1m]))",
+          "expr": "sum(rate(modstream_batcher_rejected_total[1m]))",
           "legendFormat": "shed (503)"
         },
         {
@@ -430,7 +430,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(cs_hub_dropped_events_total[1m]))",
+          "expr": "sum(rate(modstream_hub_dropped_events_total[1m]))",
           "legendFormat": "dropped for slow subscribers"
         }
       ]

@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 
-from cybershield.batching import MicroBatcher, Overloaded
+from modstream.batching import MicroBatcher, Overloaded
 
 
 @pytest.fixture

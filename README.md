@@ -1,8 +1,8 @@
-# CyberShield
+# Modstream
 
-**Real-time moderation for high-volume message streams: cyberbullying, hate speech and violent extremism, with explainable verdicts.**
+**Automatic content moderation for high-volume message streams.** Harassment, hate speech, threats and violent extremism are flagged in milliseconds, with explainable verdicts.
 
-CyberShield scores chats, posts and comments with a hybrid pipeline (a curated rule layer plus a BERT toxicity model) and turns the result into product actions: pre-send nudges, content-warning interstitials, a human review queue and a live moderator console. The serving layer is built for **thousands of concurrent streams**: async I/O, dynamic micro-batching, Redis Streams worker pools and per-node fan-out.
+Modstream scores chats, posts and comments with a hybrid pipeline (a curated rule layer plus a BERT toxicity model) and turns the result into product actions: pre-send nudges, content-warning interstitials, a human review queue and a live moderator console. The serving layer is built for **thousands of concurrent streams**: async I/O, dynamic micro-batching, Redis Streams worker pools and per-node fan-out.
 
 - **7,772 msg/s** across **2,000 concurrent WebSocket streams**, with zero errors and p99 165 ms ([load test results](loadtest/RESULTS.md))
 - **At-least-once** stream processing, with idempotent storage, crash recovery and a dead-letter queue
@@ -21,14 +21,14 @@ CyberShield scores chats, posts and comments with a hybrid pipeline (a curated r
                                    │  sync path:  /analyze, WS "analyze" ─► MicroBatcher ─► model
                                    │  async path: /messages, WS "publish" ─► XADD ─┐
                                    │                                                ▼
-                                   │                        Redis Stream  cs:messages
+                                   │                        Redis Stream  modstream:messages
                                    │                        (consumer group, at-least-once)
                                    │                                                │
                                    │               workers (N replicas): batch read ─► model
                                    │               ─► idempotent bulk insert ─► publish ─► XACK
                                    │               (XAUTOCLAIM recovery, dead-letter queue)
                                    │                                                │
- viewers ◄──SSE / WebSocket──── Hub ◄──────────── Redis Stream  cs:events ◄─────────┘
+ viewers ◄──SSE / WebSocket──── Hub ◄───── Redis Stream  modstream:events ◄─────────┘
                                    │
                          Postgres (SQLAlchemy async) · Redis counters · Prometheus → Grafana
 ```
@@ -44,12 +44,12 @@ CyberShield scores chats, posts and comments with a hybrid pipeline (a curated r
 
 ### Design decisions
 
-- **Dynamic micro-batching.** A transformer costs about the same for 1 text as for 32. The [batcher](cybershield/batching.py) holds each request for at most 5 ms so concurrent users and streams share one forward pass, run on a dedicated inference thread so the event loop never blocks.
-- **Redis Streams over Kafka.** Consumer groups, acknowledgements, pending-entry recovery and capped logs, in infrastructure a small team can run. The [broker](cybershield/broker.py) sits behind an interface with an in-memory implementation that has the same semantics, so the app runs with zero infrastructure in development.
-- **At-least-once + idempotency.** Workers acknowledge only after storing and publishing; inserts are keyed on the stream entry id, so redelivery after a crash never duplicates rows ([worker](cybershield/worker.py)).
-- **Fan-out without per-viewer cost.** Each API node tails the event log once and fans out to local subscribers through bounded queues. Events are serialized once, not per subscriber. Slow viewers get a `lagged` notice instead of stalling everyone, and can replay the durable log with `Last-Event-ID` ([hub](cybershield/hub.py)).
+- **Dynamic micro-batching.** A transformer costs about the same for 1 text as for 32. The [batcher](modstream/batching.py) holds each request for at most 5 ms so concurrent users and streams share one forward pass, run on a dedicated inference thread so the event loop never blocks.
+- **Redis Streams over Kafka.** Consumer groups, acknowledgements, pending-entry recovery and capped logs, in infrastructure a small team can run. The [broker](modstream/broker.py) sits behind an interface with an in-memory implementation that has the same semantics, so the app runs with zero infrastructure in development.
+- **At-least-once + idempotency.** Workers acknowledge only after storing and publishing; inserts are keyed on the stream entry id, so redelivery after a crash never duplicates rows ([worker](modstream/worker.py)).
+- **Fan-out without per-viewer cost.** Each API node tails the event log once and fans out to local subscribers through bounded queues. Events are serialized once, not per subscriber. Slow viewers get a `lagged` notice instead of stalling everyone, and can replay the durable log with `Last-Event-ID` ([hub](modstream/hub.py)).
 - **Load shedding.** A full batch queue returns 503 with `Retry-After` instead of letting latency grow without bound.
-- **Explainable, bias-aware detection.** Word-boundary matching with leetspeak normalization that keeps original offsets for highlighting; *contextual* terms only flag when the model agrees; purely religious vocabulary is deliberately excluded ([detector](cybershield/detector.py)).
+- **Explainable, bias-aware detection.** Word-boundary matching with leetspeak normalization that keeps original offsets for highlighting; *contextual* terms only flag when the model agrees; purely religious vocabulary is deliberately excluded ([detector](modstream/detector.py)).
 - **Privacy by default.** Analyzer and chat text is never stored; dashboards use counters, not content.
 
 ## Quick start
@@ -59,7 +59,7 @@ CyberShield scores chats, posts and comments with a hybrid pipeline (a curated r
 ```bash
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements-dev.txt                  # no PyTorch
-CS_SCORER=none python -m cybershield api             # http://127.0.0.1:8000  · API docs at /docs
+MODSTREAM_SCORER=none python -m modstream api             # http://127.0.0.1:8000  · API docs at /docs
 ```
 
 Install `requirements.txt` instead to add the Detoxify model.
@@ -90,17 +90,17 @@ curl -s localhost:8000/api/v1/analyze -H "Content-Type: application/json" -d '{"
 
 ## Configuration
 
-All settings are environment variables prefixed with `CS_` ([config.py](cybershield/config.py)):
+All settings are environment variables prefixed with `MODSTREAM_` ([config.py](modstream/config.py)):
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `CS_REDIS_URL` | unset | Unset = in-memory broker (single process) |
-| `CS_DATABASE_URL` | SQLite in `instance/` | e.g. `postgresql+asyncpg://…` |
-| `CS_RUN_WORKER` | `true` | Embed a worker in the API process; `false` when workers run separately |
-| `CS_SCORER` | `auto` | `auto`, `detoxify` or `none` (rules only) |
-| `CS_BATCH_MAX_SIZE` / `CS_BATCH_MAX_WAIT_MS` | `32` / `5` | Micro-batching window |
-| `CS_FLAG_THRESHOLD` / `CS_REVIEW_THRESHOLD` | `0.7` / `0.4` | Verdict policy |
-| `CS_SECRET_KEY` | random | **Required** when `CS_ENV=prod` (shared across processes) |
+| `MODSTREAM_REDIS_URL` | unset | Unset = in-memory broker (single process) |
+| `MODSTREAM_DATABASE_URL` | SQLite in `instance/` | e.g. `postgresql+asyncpg://…` |
+| `MODSTREAM_RUN_WORKER` | `true` | Embed a worker in the API process; `false` when workers run separately |
+| `MODSTREAM_SCORER` | `auto` | `auto`, `detoxify` or `none` (rules only) |
+| `MODSTREAM_BATCH_MAX_SIZE` / `MODSTREAM_BATCH_MAX_WAIT_MS` | `32` / `5` | Micro-batching window |
+| `MODSTREAM_FLAG_THRESHOLD` / `MODSTREAM_REVIEW_THRESHOLD` | `0.7` / `0.4` | Verdict policy |
+| `MODSTREAM_SECRET_KEY` | random | **Required** when `MODSTREAM_ENV=prod` (shared across processes) |
 
 ## Testing & load testing
 

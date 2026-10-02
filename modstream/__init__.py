@@ -1,4 +1,4 @@
-"""CyberShield: real-time harmful content detection for message streams."""
+"""Modstream: real-time content moderation for high-volume message streams."""
 
 __version__ = "3.0.0"
 

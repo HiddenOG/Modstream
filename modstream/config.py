@@ -1,4 +1,4 @@
-"""Typed settings, loaded from environment variables prefixed with ``CS_``."""
+"""Typed settings, loaded from environment variables prefixed with ``MODSTREAM_``."""
 
 from __future__ import annotations
 
@@ -10,14 +10,14 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="CS_", env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="MODSTREAM_", env_file=".env", extra="ignore")
 
     env: Literal["dev", "test", "prod"] = "dev"
     secret_key: str = Field(default_factory=lambda: secrets.token_hex(32))
     log_json: bool = False
 
     # Infrastructure. Leave redis_url unset to run everything in one process.
-    database_url: str = "sqlite+aiosqlite:///instance/cybershield.db"
+    database_url: str = "sqlite+aiosqlite:///instance/modstream.db"
     create_schema: bool = True  # turn off when schema changes are applied by a deploy step
     redis_url: str | None = None
     upload_dir: str = "instance/uploads"
@@ -57,5 +57,5 @@ class Settings(BaseSettings):
     def _require_shared_secret(self):
         # A per-process random key breaks sessions as soon as there is more than one process.
         if self.env == "prod" and "secret_key" not in self.model_fields_set:
-            raise ValueError("CS_SECRET_KEY must be set when CS_ENV=prod")
+            raise ValueError("MODSTREAM_SECRET_KEY must be set when MODSTREAM_ENV=prod")
         return self

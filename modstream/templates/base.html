@@ -4,8 +4,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}{% endblock %}{% if self.title() %} · {% endif %}CyberShield</title>
-  <meta name="description" content="{% block description %}CyberShield detects cyberbullying, hate speech and violent extremism in real time with a hybrid rules + transformer pipeline.{% endblock %}">
+  <title>{% block title %}{% endblock %}{% if self.title() %} · {% endif %}Modstream</title>
+  <meta name="description" content="{% block description %}Modstream moderates chats, posts and message streams in real time: harassment, hate speech, threats and extremism flagged in milliseconds, with explainable verdicts.{% endblock %}">
   <meta name="theme-color" content="#4f46e5">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234f46e5' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z'/%3E%3Cpath d='m9 12 2 2 4-4'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -33,7 +33,7 @@
     <div class="container">
       <a class="brand" href="{{ url_for('pages.home') }}">
         <span class="brand-mark">{{ icon("shield") }}</span>
-        CyberShield
+        Modstream
       </a>
       <nav class="nav" id="site-nav" aria-label="Main">
         {% for ep, label, ic in nav %}
@@ -69,7 +69,7 @@
 
   <footer class="site-footer">
     <div class="container">
-      <span>CyberShield v{{ app_version }} · engine <span class="mono">{{ engine }}</span></span>
+      <span>Modstream v{{ app_version }} · engine <span class="mono">{{ engine }}</span></span>
       <span class="row" style="--gap: 18px">
         <a href="{{ url_for('pages.about') }}#api">API</a>
         <a href="{{ url_for('api.health') }}">Status</a>
