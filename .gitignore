@@ -12,3 +12,8 @@ instance/
 static/uploads/*
 !static/uploads/.gitkeep
 .pytest_cache/
+
+# Local settings and secrets: never commit. Copy .env.example to .env instead.
+.env
+.env.*
+!.env.example
