@@ -47,15 +47,28 @@ def test_contextual_term_alone_needs_review(detector):
     assert detector.analyze("that exam was stupid hard").verdict == "review"
 
 
-def test_contextual_term_confirmed_by_model_flags(detector):
+def test_contextual_term_aimed_at_a_person_flags(detector):
     assert detector.analyze("you are stupid MEH").verdict == "flagged"
 
 
-def test_model_alone_can_flag(detector):
+def test_model_alone_sends_to_review_but_never_flags(detector):
     result = detector.analyze("TOXIC words with no lexicon hits")
-    assert result.verdict == "flagged"
+    assert result.verdict == "review"
+    assert result.risk < detector.flag_threshold  # score agrees with the verdict
     assert result.model_scores["toxicity"] == 0.95
     assert "harassment" in result.categories  # insult -> harassment
+    assert any("needs a human" in r for r in result.reasons)
+
+
+def test_model_swearing_scores_alone_are_ignored(detector):
+    # FakeScorer gives "MEH" toxicity 0.5 but insult 0.1: swearing-style scores don't trigger review.
+    assert detector.analyze("MEH, what a day").verdict == "safe"
+
+
+def test_rules_flag_and_model_agreement_is_reported(detector):
+    result = detector.analyze("you idiot TOXIC")
+    assert result.verdict == "flagged"
+    assert any("Model sees a possible insult" in r for r in result.reasons)
 
 
 def test_safe_text(detector):
@@ -77,7 +90,7 @@ def test_results_are_cached(detector, scorer):
 
 def test_batch_scores_in_one_call(detector, scorer):
     results = detector.analyze_many(["a", "b", "TOXIC c"])
-    assert [r.verdict for r in results] == ["safe", "safe", "flagged"]
+    assert [r.verdict for r in results] == ["safe", "safe", "review"]
     assert scorer.calls == 1
 
 

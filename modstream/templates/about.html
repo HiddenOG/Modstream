@@ -35,8 +35,8 @@
       <h2 id="detection">Detection pipeline</h2>
       <ol>
         <li><strong>Normalization.</strong> A 1:1 character translation undoes common evasions (<code>1d10t → idiot</code>, <code>$tup1d → stupid</code>) without shifting offsets, so matches can be highlighted in the original text.</li>
-        <li><strong>Rule layer.</strong> Word-boundary regexes over a curated, tiered lexicon. <em>Strong</em> terms (slurs, explicit threats, self-harm encouragement) flag on their own. <em>Contextual</em> terms ("stupid", "bomb", names of extremist groups) only send content to review unless the model agrees.</li>
-        <li><strong>Model layer.</strong> <code>{{ engine }}</code>, a BERT model fine-tuned on the Jigsaw toxic comment dataset, scores toxicity, severe toxicity, obscenity, threats, insults and identity attacks. The model sits behind a <code>Scorer</code> protocol, so it can be swapped or mocked in tests. It loads lazily in a background thread, and batch requests are scored in a single forward pass.</li>
+        <li><strong>Rule layer.</strong> One compiled pattern over a curated lexicon with three tiers. <em>Strong</em> terms (slurs, explicit threats, self-harm encouragement) flag on their own. <em>Contextual</em> insults ("stupid", "loser") go to review, and are flagged when aimed at a person ("you're so stupid"). <em>Mild</em> profanity is allowed unless it targets someone ("fuck you", "your mom is a..."). Disguises (stretched, masked and spaced letters, known misspellings) are undone first, and a pattern catches threats such as "I'm going to find you and hurt you".</li>
+        <li><strong>Model layer.</strong> Detoxify <em>unbiased</em> (a RoBERTa transformer trained on Civil Comments to reduce false positives on identity mentions; engine here: <code>{{ engine }}</code>). Only its insult, threat, identity-attack and severe-toxicity scores count; its "toxicity" and "obscene" scores mostly mean "contains swearing". It acts as triage: it can send a message to human review but never flags alone. It sits behind a <code>Scorer</code> protocol, loads in a background thread, and concurrent requests share one forward pass. When the model isn't installed, the rules run alone.</li>
         <li><strong>Policy.</strong> Signals combine into a verdict, a 0–1 risk score, unified categories and human-readable reasons.</li>
       </ol>
 
@@ -44,12 +44,12 @@
       <div class="table-wrap"><table>
         <thead><tr><th>Verdict</th><th>When</th><th>Platform action</th></tr></thead>
         <tbody>
-          <tr><td><span class="badge badge-flagged">Flagged</span></td><td>Strong term, <em>or</em> model ≥ 0.70, <em>or</em> contextual term + model ≥ 0.40</td><td>Nudge author; blur behind content warning</td></tr>
-          <tr><td><span class="badge badge-review">Needs review</span></td><td>Contextual term alone, <em>or</em> model between 0.40 and 0.70</td><td>Nudge author; label for human review</td></tr>
-          <tr><td><span class="badge badge-safe">Safe</span></td><td>No signals</td><td>Publish normally</td></tr>
+          <tr><td><span class="badge badge-flagged">Flagged</span></td><td>A strong term (slur, threat, self-harm encouragement), <em>or</em> an insult or swear word aimed at a person or stacked with another insult</td><td>Nudge author; blur behind content warning</td></tr>
+          <tr><td><span class="badge badge-review">Needs review</span></td><td>A context-dependent term alone, <em>or</em> the model scores an insult, threat or identity attack ≥ 0.40</td><td>Nudge author; label for human review</td></tr>
+          <tr><td><span class="badge badge-safe">Safe</span></td><td>No signals, or swearing not aimed at anyone</td><td>Publish normally</td></tr>
         </tbody>
       </table></div>
-      <p class="muted small">Thresholds are configurable via the <code>FLAG_THRESHOLD</code> and <code>REVIEW_THRESHOLD</code> environment variables.</p>
+      <p class="muted small">The model never flags on its own. On the evaluation set, letting it flag raised false alarms from 5.6% to 9.7–31.9% (friendly banter, people speaking out against bullying, and identity mentions such as "I'm a proud gay man"). As a triage signal it sends more harmful content to review without adding false alarms. The review threshold is set with <code>MODSTREAM_REVIEW_THRESHOLD</code>.</p>
 
       <h2 id="api">API reference</h2>
       <p>All endpoints live under <code>/api/v1</code> and return JSON; interactive OpenAPI docs are at <a href="/docs">/docs</a>, and Prometheus metrics at <code>/metrics</code>. Errors follow one shape: <code>{"error": {"code", "message", "field"}}</code>.</p>

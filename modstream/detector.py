@@ -6,13 +6,15 @@ Pipeline for each text:
    1:1 translation so match offsets still line up with the original text.
 2. **Lexicon** match with word boundaries (no more "made" matching "mad").
 3. **Model** scoring via a pluggable ``Scorer`` (Detoxify by default).
-4. **Policy** combines both signals into ``safe`` / ``review`` / ``flagged``.
+4. **Policy** combines both signals into ``safe`` / ``review`` / ``flagged``. Rules decide what is
+   flagged; the model is a triage signal that can send a message to human review (see ``_decide``).
 """
 
 from __future__ import annotations
 
 import importlib.util
 import logging
+import os
 import re
 import threading
 import time
@@ -35,6 +37,12 @@ MODEL_CATEGORY = {
     "threat": "threat",
     "sexual_explicit": "profanity",
 }
+
+# Model labels that describe an attack on a person or group (as opposed to swearing in general).
+ATTACK_LABELS = {"insult", "threat", "identity_attack", "identity_hate", "severe_toxicity"}
+
+# Hugging Face cache folder of the tokenizer/config each Detoxify checkpoint needs.
+_HF_BASE = {"unbiased": "roberta-base", "original": "bert-base-uncased", "multilingual": "xlm-roberta-base"}
 
 @dataclass(frozen=True)
 class Match:
@@ -92,9 +100,9 @@ class NullScorer:
 
 
 class DetoxifyScorer:
-    """Lazily loads a Detoxify model (a BERT fine-tuned on Jigsaw data)."""
+    """Lazily loads a Detoxify model (a transformer fine-tuned on Jigsaw toxicity data)."""
 
-    def __init__(self, variant: str = "original"):
+    def __init__(self, variant: str = "unbiased"):
         self.name = f"detoxify-{variant}"
         self.variant = variant
         self._model = None
@@ -108,12 +116,24 @@ class DetoxifyScorer:
         if self._model is None:
             with self._lock:
                 if self._model is None:
+                    self._prefer_offline()
                     from detoxify import Detoxify
 
                     started = time.perf_counter()
                     self._model = Detoxify(self.variant)
                     log.info("Loaded %s in %.1fs", self.name, time.perf_counter() - started)
         return self._model
+
+    def _prefer_offline(self) -> None:
+        """Once the tokenizer files are cached, load without contacting Hugging Face.
+        Online checks made a cached load take ~3 minutes instead of ~5 seconds."""
+        if "HF_HUB_OFFLINE" in os.environ:
+            return
+        cache = os.environ.get("HF_HUB_CACHE") or os.path.join(
+            os.environ.get("HF_HOME", os.path.join(os.path.expanduser("~"), ".cache", "huggingface")), "hub")
+        base = _HF_BASE.get(self.variant, "")
+        if base and os.path.isdir(os.path.join(cache, f"models--{base}")):
+            os.environ["HF_HUB_OFFLINE"] = "1"
 
     def score(self, texts: list[str]) -> list[dict[str, float]]:
         raw = self.load().predict(texts)
@@ -355,7 +375,14 @@ class Detector:
         strong = [m for m in matches if m.tier == "strong"]
         contextual = [m for m in matches if m.tier == "contextual"]
         mild = [m for m in matches if m.tier == "mild"]
-        model_max = max(scores.values(), default=0.0)
+        # The model is a triage signal: only its person-attack labels count (its "toxicity"
+        # and "obscene" scores mostly mean "contains swearing", which policy allows), and it
+        # can send a message to review but never flag it alone. On the evaluation set, letting
+        # it flag raised false alarms from 5.6% to 9.7-31.9% (banter, counter-speech, identity
+        # mentions); as triage it adds review coverage with no new false alarms.
+        attack = {label: value for label, value in scores.items() if label in ATTACK_LABELS}
+        attack_label = max(attack, key=attack.get) if attack else None
+        model_attack = attack.get(attack_label, 0.0) if attack_label else 0.0
 
         def names(ms):
             return ", ".join(sorted({m.term for m in ms}))
@@ -369,28 +396,25 @@ class Detector:
             reasons.append(f"Matched context-dependent terms: {names(contextual)}")
         if mild and not strong and not contextual:
             reasons.append(f"Profanity not aimed at anyone ({names(mild)}): allowed")
-        if scores and model_max >= self.review_threshold:
-            label = max(scores, key=scores.get)
-            reasons.append(f"Model scored '{label.replace('_', ' ')}' at {model_max:.0%}")
 
-        if strong or model_max >= self.flag_threshold:
+        if strong:
             verdict = "flagged"
-        elif contextual and model_max >= self.review_threshold:
-            verdict = "flagged"
-            reasons.append("Context-dependent term confirmed by the model")
-        elif contextual or model_max >= self.review_threshold:
+        elif contextual or model_attack >= self.review_threshold:
             verdict = "review"
         else:
             verdict = "safe"
+        if model_attack >= self.review_threshold:
+            reasons.append(f"Model sees a possible {attack_label.replace('_', ' ')} ({model_attack:.0%})"
+                           + ("" if strong else ": needs a human to judge context"))
 
-        risk = max(model_max, 0.92 if strong else 0.0, 0.45 if contextual else 0.0, 0.1 if mild else 0.0)
-        if verdict == "flagged":
-            risk = max(risk, self.flag_threshold)
+        # A model-only signal stays below the flag threshold so the score matches the verdict.
+        model_risk = model_attack if strong else min(model_attack, self.flag_threshold - 0.01)
+        risk = max(model_risk, 0.92 if strong else 0.0, 0.45 if contextual else 0.0, 0.1 if mild else 0.0)
 
         categories = {m.category for m in matches if m.tier != "mild"}
         categories |= {
             MODEL_CATEGORY.get(label, label)
-            for label, value in scores.items()
+            for label, value in attack.items()
             if value >= self.review_threshold
         }
         return Analysis(

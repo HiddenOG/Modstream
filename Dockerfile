@@ -4,7 +4,8 @@ FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    HF_HOME=/opt/models
+    HF_HOME=/opt/models \
+    TORCH_HOME=/opt/models/torch
 
 WORKDIR /app
 
@@ -14,7 +15,9 @@ COPY requirements-core.txt requirements.txt ./
 RUN pip install -r requirements.txt
 
 # Bake model weights into the image so containers start without a download.
-RUN python -c "from detoxify import Detoxify; Detoxify('original')" && chmod -R a+rX /opt/models
+RUN python -c "from detoxify import Detoxify; Detoxify('unbiased')" && chmod -R a+rX /opt/models
+# Weights are baked in, so never contact Hugging Face at runtime (an online check costs minutes per start).
+ENV HF_HUB_OFFLINE=1
 
 COPY . .
 RUN useradd --create-home app && mkdir -p instance && chown -R app instance

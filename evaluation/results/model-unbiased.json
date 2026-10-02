@@ -1,0 +1,1426 @@
+{
+  "variants": [
+    {
+      "name": "rules only",
+      "messages": 179,
+      "harmful": 107,
+      "safe": 72,
+      "catch_rate": 0.7476635514018691,
+      "sent_to_review": 0.8037383177570093,
+      "false_alarm_rate": 0.05555555555555555,
+      "review_load": 0.18055555555555555,
+      "by_tag": {
+        "direct_insult": {
+          "label": "harmful",
+          "n": 25,
+          "flagged": 23,
+          "review": 1,
+          "safe": 1
+        },
+        "directed_profanity": {
+          "label": "harmful",
+          "n": 15,
+          "flagged": 15,
+          "review": 0,
+          "safe": 0
+        },
+        "obfuscated": {
+          "label": "harmful",
+          "n": 25,
+          "flagged": 24,
+          "review": 0,
+          "safe": 1
+        },
+        "threat": {
+          "label": "harmful",
+          "n": 12,
+          "flagged": 7,
+          "review": 2,
+          "safe": 3
+        },
+        "self_harm": {
+          "label": "harmful",
+          "n": 8,
+          "flagged": 4,
+          "review": 0,
+          "safe": 4
+        },
+        "hate": {
+          "label": "harmful",
+          "n": 12,
+          "flagged": 6,
+          "review": 3,
+          "safe": 3
+        },
+        "no_keywords": {
+          "label": "harmful",
+          "n": 10,
+          "flagged": 1,
+          "review": 0,
+          "safe": 9
+        },
+        "everyday": {
+          "label": "safe",
+          "n": 21,
+          "flagged": 0,
+          "review": 1,
+          "safe": 20
+        },
+        "undirected_profanity": {
+          "label": "safe",
+          "n": 12,
+          "flagged": 0,
+          "review": 0,
+          "safe": 12
+        },
+        "lookalike": {
+          "label": "safe",
+          "n": 15,
+          "flagged": 0,
+          "review": 2,
+          "safe": 13
+        },
+        "news_counterspeech": {
+          "label": "safe",
+          "n": 12,
+          "flagged": 2,
+          "review": 5,
+          "safe": 5
+        },
+        "borderline": {
+          "label": "safe",
+          "n": 12,
+          "flagged": 2,
+          "review": 5,
+          "safe": 5
+        }
+      },
+      "errors": [
+        {
+          "text": "imagine being this dumb",
+          "label": "harmful",
+          "tag": "direct_insult",
+          "verdict": "review",
+          "note": "matched=['dumb'] model=-"
+        },
+        {
+          "text": "everyone in class thinks you're a joke",
+          "label": "harmful",
+          "tag": "direct_insult",
+          "verdict": "safe",
+          "note": "matched=[] model=-"
+        },
+        {
+          "text": "sh!t for brains",
+          "label": "harmful",
+          "tag": "obfuscated",
+          "verdict": "safe",
+          "note": "matched=['shit'] model=-"
+        },
+        {
+          "text": "watch your back after school",
+          "label": "harmful",
+          "tag": "threat",
+          "verdict": "review",
+          "note": "matched=['watch your back'] model=-"
+        },
+        {
+          "text": "i know where you live",
+          "label": "harmful",
+          "tag": "threat",
+          "verdict": "review",
+          "note": "matched=['i know where you live'] model=-"
+        },
+        {
+          "text": "i'll beat you until you can't walk",
+          "label": "harmful",
+          "tag": "threat",
+          "verdict": "safe",
+          "note": "matched=[] model=-"
+        },
+        {
+          "text": "i'll make you regret this",
+          "label": "harmful",
+          "tag": "threat",
+          "verdict": "safe",
+          "note": "matched=[] model=-"
+        },
+        {
+          "text": "you'd better sleep with one eye open",
+          "label": "harmful",
+          "tag": "threat",
+          "verdict": "safe",
+          "note": "matched=[] model=-"
+        },
+        {
+          "text": "nobody would miss you if you were gone",
+          "label": "harmful",
+          "tag": "self_harm",
+          "verdict": "safe",
+          "note": "matched=[] model=-"
+        },
+        {
+          "text": "the world would be better without you",
+          "label": "harmful",
+          "tag": "self_harm",
+          "verdict": "safe",
+          "note": "matched=[] model=-"
+        },
+        {
+          "text": "just end it already",
+          "label": "harmful",
+          "tag": "self_harm",
+          "verdict": "safe",
+          "note": "matched=[] model=-"
+        },
+        {
+          "text": "do everyone a favour and disappear forever",
+          "label": "harmful",
+          "tag": "self_harm",
+          "verdict": "safe",
+          "note": "matched=[] model=-"
+        },
+        {
+          "text": "all of those people are animals and should be wiped out",
+          "label": "harmful",
+          "tag": "hate",
+          "verdict": "safe",
+          "note": "matched=[] model=-"
+        },
+        {
+          "text": "go back to where you came from",
+          "label": "harmful",
+          "tag": "hate",
+          "verdict": "safe",
+          "note": "matched=[] model=-"
+        },
+        {
+          "text": "women are too stupid to vote",
+          "label": "harmful",
+          "tag": "hate",
+          "verdict": "review",
+          "note": "matched=['stupid'] model=-"
+        },
+        {
+          "text": "you people are a disease",
+          "label": "harmful",
+          "tag": "hate",
+          "verdict": "safe",
+          "note": "matched=[] model=-"
+        },
+        {
+          "text": "he's a terrorist because of his religion",
+          "label": "harmful",
+          "tag": "hate",
+          "verdict": "review",
+          "note": "matched=['terrorist'] model=-"
+        },
+        {
+          "text": "join the jihadist cause and become a martyr, kill the infidels",
+          "label": "harmful",
+          "tag": "hate",
+          "verdict": "review",
+          "note": "matched=['jihadist'] model=-"
+        },
+        {
+          "text": "no one will ever love you",
+          "label": "harmful",
+          "tag": "no_keywords",
+          "verdict": "safe",
+          "note": "matched=[] model=-"
+        },
+        {
+          "text": "you're a waste of oxygen",
+          "label": "harmful",
+          "tag": "no_keywords",
+          "verdict": "safe",
+          "note": "matched=[] model=-"
+        },
+        {
+          "text": "everyone laughs at you behind your back",
+          "label": "harmful",
+          "tag": "no_keywords",
+          "verdict": "safe",
+          "note": "matched=[] model=-"
+        },
+        {
+          "text": "your parents must be so ashamed of you",
+          "label": "harmful",
+          "tag": "no_keywords",
+          "verdict": "safe",
+          "note": "matched=[] model=-"
+        },
+        {
+          "text": "you look like something the cat dragged in",
+          "label": "harmful",
+          "tag": "no_keywords",
+          "verdict": "safe",
+          "note": "matched=[] model=-"
+        },
+        {
+          "text": "you have the brain of a goldfish",
+          "label": "harmful",
+          "tag": "no_keywords",
+          "verdict": "safe",
+          "note": "matched=[] model=-"
+        },
+        {
+          "text": "nobody invited you, leave",
+          "label": "harmful",
+          "tag": "no_keywords",
+          "verdict": "safe",
+          "note": "matched=[] model=-"
+        },
+        {
+          "text": "you'll never amount to anything",
+          "label": "harmful",
+          "tag": "no_keywords",
+          "verdict": "safe",
+          "note": "matched=[] model=-"
+        },
+        {
+          "text": "you should be embarrassed to even exist",
+          "label": "harmful",
+          "tag": "no_keywords",
+          "verdict": "safe",
+          "note": "matched=[] model=-"
+        },
+        {
+          "text": "that movie was the bomb",
+          "label": "safe",
+          "tag": "everyday",
+          "verdict": "review",
+          "note": "matched=['bomb'] model=-"
+        },
+        {
+          "text": "mad respect for the volunteers",
+          "label": "safe",
+          "tag": "lookalike",
+          "verdict": "review",
+          "note": "matched=['mad'] model=-"
+        },
+        {
+          "text": "i'm mad at myself for missing the bus",
+          "label": "safe",
+          "tag": "lookalike",
+          "verdict": "review",
+          "note": "matched=['mad'] model=-"
+        },
+        {
+          "text": "The news covered the Boko Haram kidnapping in the north today.",
+          "label": "safe",
+          "tag": "news_counterspeech",
+          "verdict": "review",
+          "note": "matched=['boko haram', 'kidnapping'] model=-"
+        },
+        {
+          "text": "Calling someone a loser online is bullying. Please stop.",
+          "label": "safe",
+          "tag": "news_counterspeech",
+          "verdict": "flagged",
+          "note": "matched=['loser'] model=-"
+        },
+        {
+          "text": "the documentary explains how ISIS recruited online",
+          "label": "safe",
+          "tag": "news_counterspeech",
+          "verdict": "review",
+          "note": "matched=['isis'] model=-"
+        },
+        {
+          "text": "my grandfather fought against the nazis",
+          "label": "safe",
+          "tag": "news_counterspeech",
+          "verdict": "review",
+          "note": "matched=['nazi'] model=-"
+        },
+        {
+          "text": "police arrested a gunman after the attack",
+          "label": "safe",
+          "tag": "news_counterspeech",
+          "verdict": "review",
+          "note": "matched=['gunman'] model=-"
+        },
+        {
+          "text": "if someone tells you to kill yourself, report it and talk to someone you trust",
+          "label": "safe",
+          "tag": "news_counterspeech",
+          "verdict": "flagged",
+          "note": "matched=['kill yourself'] model=-"
+        },
+        {
+          "text": "the hostage situation ended peacefully",
+          "label": "safe",
+          "tag": "news_counterspeech",
+          "verdict": "review",
+          "note": "matched=['hostage'] model=-"
+        },
+        {
+          "text": "that exam was stupid hard",
+          "label": "safe",
+          "tag": "borderline",
+          "verdict": "review",
+          "note": "matched=['stupid'] model=-"
+        },
+        {
+          "text": "this game sucks",
+          "label": "safe",
+          "tag": "borderline",
+          "verdict": "review",
+          "note": "matched=['suck'] model=-"
+        },
+        {
+          "text": "I'm such an idiot, I left my wallet at home",
+          "label": "safe",
+          "tag": "borderline",
+          "verdict": "review",
+          "note": "matched=['idiot'] model=-"
+        },
+        {
+          "text": "stop being lame and come to the party",
+          "label": "safe",
+          "tag": "borderline",
+          "verdict": "review",
+          "note": "matched=['lame'] model=-"
+        },
+        {
+          "text": "ugh I look so ugly in this photo",
+          "label": "safe",
+          "tag": "borderline",
+          "verdict": "review",
+          "note": "matched=['ugly'] model=-"
+        },
+        {
+          "text": "this song is a total bop, you fool",
+          "label": "safe",
+          "tag": "borderline",
+          "verdict": "flagged",
+          "note": "matched=['fool'] model=-"
+        },
+        {
+          "text": "you dumbo, you forgot the snacks haha",
+          "label": "safe",
+          "tag": "borderline",
+          "verdict": "flagged",
+          "note": "matched=['dumbo'] model=-"
+        }
+      ],
+      "ms_per_message": 0.222
+    },
+    {
+      "name": "model only",
+      "messages": 179,
+      "harmful": 107,
+      "safe": 72,
+      "catch_rate": 0.6261682242990654,
+      "sent_to_review": 0.6915887850467289,
+      "false_alarm_rate": 0.3055555555555556,
+      "review_load": 0.041666666666666664,
+      "by_tag": {
+        "direct_insult": {
+          "label": "harmful",
+          "n": 25,
+          "flagged": 18,
+          "review": 2,
+          "safe": 5
+        },
+        "directed_profanity": {
+          "label": "harmful",
+          "n": 15,
+          "flagged": 12,
+          "review": 0,
+          "safe": 3
+        },
+        "obfuscated": {
+          "label": "harmful",
+          "n": 25,
+          "flagged": 18,
+          "review": 1,
+          "safe": 6
+        },
+        "threat": {
+          "label": "harmful",
+          "n": 12,
+          "flagged": 7,
+          "review": 1,
+          "safe": 4
+        },
+        "self_harm": {
+          "label": "harmful",
+          "n": 8,
+          "flagged": 2,
+          "review": 1,
+          "safe": 5
+        },
+        "hate": {
+          "label": "harmful",
+          "n": 12,
+          "flagged": 8,
+          "review": 0,
+          "safe": 4
+        },
+        "no_keywords": {
+          "label": "harmful",
+          "n": 10,
+          "flagged": 2,
+          "review": 2,
+          "safe": 6
+        },
+        "everyday": {
+          "label": "safe",
+          "n": 21,
+          "flagged": 0,
+          "review": 1,
+          "safe": 20
+        },
+        "undirected_profanity": {
+          "label": "safe",
+          "n": 12,
+          "flagged": 11,
+          "review": 1,
+          "safe": 0
+        },
+        "lookalike": {
+          "label": "safe",
+          "n": 15,
+          "flagged": 0,
+          "review": 0,
+          "safe": 15
+        },
+        "news_counterspeech": {
+          "label": "safe",
+          "n": 12,
+          "flagged": 3,
+          "review": 0,
+          "safe": 9
+        },
+        "borderline": {
+          "label": "safe",
+          "n": 12,
+          "flagged": 8,
+          "review": 1,
+          "safe": 3
+        }
+      },
+      "errors": [
+        {
+          "text": "ugly cow",
+          "label": "harmful",
+          "tag": "direct_insult",
+          "verdict": "review",
+          "note": "model=toxicity=0.63"
+        },
+        {
+          "text": "go cry somewhere else you baby, nobody cares",
+          "label": "harmful",
+          "tag": "direct_insult",
+          "verdict": "safe",
+          "note": "model=toxicity=0.21"
+        },
+        {
+          "text": "your fada",
+          "label": "harmful",
+          "tag": "direct_insult",
+          "verdict": "safe",
+          "note": "model=toxicity=0.12"
+        },
+        {
+          "text": "you dey craze, mumu",
+          "label": "harmful",
+          "tag": "direct_insult",
+          "verdict": "review",
+          "note": "model=toxicity=0.48"
+        },
+        {
+          "text": "you be olodo, you no sabi anything",
+          "label": "harmful",
+          "tag": "direct_insult",
+          "verdict": "safe",
+          "note": "model=toxicity=0.01"
+        },
+        {
+          "text": "everyone in class thinks you're a joke",
+          "label": "harmful",
+          "tag": "direct_insult",
+          "verdict": "safe",
+          "note": "model=toxicity=0.24"
+        },
+        {
+          "text": "freak. nobody likes you",
+          "label": "harmful",
+          "tag": "direct_insult",
+          "verdict": "safe",
+          "note": "model=toxicity=0.34"
+        },
+        {
+          "text": "ur mom is a hoe",
+          "label": "harmful",
+          "tag": "directed_profanity",
+          "verdict": "safe",
+          "note": "model=toxicity=0.29"
+        },
+        {
+          "text": "stfu nobody asked you",
+          "label": "harmful",
+          "tag": "directed_profanity",
+          "verdict": "safe",
+          "note": "model=toxicity=0.09"
+        },
+        {
+          "text": "gtfo of this server",
+          "label": "harmful",
+          "tag": "directed_profanity",
+          "verdict": "safe",
+          "note": "model=toxicity=0.00"
+        },
+        {
+          "text": "phuck you",
+          "label": "harmful",
+          "tag": "obfuscated",
+          "verdict": "review",
+          "note": "model=toxicity=0.42"
+        },
+        {
+          "text": "ur an 1d10t",
+          "label": "harmful",
+          "tag": "obfuscated",
+          "verdict": "safe",
+          "note": "model=toxicity=0.02"
+        },
+        {
+          "text": "you l0ser",
+          "label": "harmful",
+          "tag": "obfuscated",
+          "verdict": "safe",
+          "note": "model=toxicity=0.30"
+        },
+        {
+          "text": "i d i o t",
+          "label": "harmful",
+          "tag": "obfuscated",
+          "verdict": "safe",
+          "note": "model=toxicity=0.32"
+        },
+        {
+          "text": "k y s",
+          "label": "harmful",
+          "tag": "obfuscated",
+          "verdict": "safe",
+          "note": "model=toxicity=0.02"
+        },
+        {
+          "text": "go k1ll yourself",
+          "label": "harmful",
+          "tag": "obfuscated",
+          "verdict": "safe",
+          "note": "model=toxicity=0.19"
+        },
+        {
+          "text": "a$$hole",
+          "label": "harmful",
+          "tag": "obfuscated",
+          "verdict": "safe",
+          "note": "model=toxicity=0.07"
+        },
+        {
+          "text": "watch your back after school",
+          "label": "harmful",
+          "tag": "threat",
+          "verdict": "safe",
+          "note": "model=toxicity=0.01"
+        },
+        {
+          "text": "i know where you live",
+          "label": "harmful",
+          "tag": "threat",
+          "verdict": "safe",
+          "note": "model=toxicity=0.00"
+        },
+        {
+          "text": "i'll beat you until you can't walk",
+          "label": "harmful",
+          "tag": "threat",
+          "verdict": "review",
+          "note": "model=toxicity=0.41"
+        },
+        {
+          "text": "i'll make you regret this",
+          "label": "harmful",
+          "tag": "threat",
+          "verdict": "safe",
+          "note": "model=toxicity=0.00"
+        },
+        {
+          "text": "you'd better sleep with one eye open",
+          "label": "harmful",
+          "tag": "threat",
+          "verdict": "safe",
+          "note": "model=toxicity=0.04"
+        },
+        {
+          "text": "kys",
+          "label": "harmful",
+          "tag": "self_harm",
+          "verdict": "safe",
+          "note": "model=toxicity=0.02"
+        },
+        {
+          "text": "nobody would miss you if you were gone",
+          "label": "harmful",
+          "tag": "self_harm",
+          "verdict": "safe",
+          "note": "model=toxicity=0.12"
+        },
+        {
+          "text": "the world would be better without you",
+          "label": "harmful",
+          "tag": "self_harm",
+          "verdict": "safe",
+          "note": "model=toxicity=0.18"
+        },
+        {
+          "text": "just end it already",
+          "label": "harmful",
+          "tag": "self_harm",
+          "verdict": "safe",
+          "note": "model=toxicity=0.03"
+        },
+        {
+          "text": "do everyone a favour and disappear forever",
+          "label": "harmful",
+          "tag": "self_harm",
+          "verdict": "safe",
+          "note": "model=toxicity=0.34"
+        },
+        {
+          "text": "why don't you just jump off a bridge",
+          "label": "harmful",
+          "tag": "self_harm",
+          "verdict": "review",
+          "note": "model=toxicity=0.60"
+        },
+        {
+          "text": "white power forever",
+          "label": "harmful",
+          "tag": "hate",
+          "verdict": "safe",
+          "note": "model=identity_attack=0.26"
+        },
+        {
+          "text": "go back to where you came from",
+          "label": "harmful",
+          "tag": "hate",
+          "verdict": "safe",
+          "note": "model=toxicity=0.13"
+        },
+        {
+          "text": "dirty wetback",
+          "label": "harmful",
+          "tag": "hate",
+          "verdict": "safe",
+          "note": "model=toxicity=0.05"
+        },
+        {
+          "text": "chink go home",
+          "label": "harmful",
+          "tag": "hate",
+          "verdict": "safe",
+          "note": "model=toxicity=0.07"
+        },
+        {
+          "text": "no one will ever love you",
+          "label": "harmful",
+          "tag": "no_keywords",
+          "verdict": "safe",
+          "note": "model=toxicity=0.10"
+        },
+        {
+          "text": "everyone laughs at you behind your back",
+          "label": "harmful",
+          "tag": "no_keywords",
+          "verdict": "review",
+          "note": "model=toxicity=0.58"
+        },
+        {
+          "text": "your parents must be so ashamed of you",
+          "label": "harmful",
+          "tag": "no_keywords",
+          "verdict": "safe",
+          "note": "model=toxicity=0.28"
+        },
+        {
+          "text": "you look like something the cat dragged in",
+          "label": "harmful",
+          "tag": "no_keywords",
+          "verdict": "safe",
+          "note": "model=toxicity=0.02"
+        },
+        {
+          "text": "you have the brain of a goldfish",
+          "label": "harmful",
+          "tag": "no_keywords",
+          "verdict": "review",
+          "note": "model=toxicity=0.59"
+        },
+        {
+          "text": "nobody invited you, leave",
+          "label": "harmful",
+          "tag": "no_keywords",
+          "verdict": "safe",
+          "note": "model=toxicity=0.01"
+        },
+        {
+          "text": "you'll never amount to anything",
+          "label": "harmful",
+          "tag": "no_keywords",
+          "verdict": "safe",
+          "note": "model=toxicity=0.01"
+        },
+        {
+          "text": "you should be embarrassed to even exist",
+          "label": "harmful",
+          "tag": "no_keywords",
+          "verdict": "safe",
+          "note": "model=toxicity=0.31"
+        },
+        {
+          "text": "we killed it at the concert last night",
+          "label": "safe",
+          "tag": "everyday",
+          "verdict": "review",
+          "note": "model=toxicity=0.61"
+        },
+        {
+          "text": "this traffic is fucking awful",
+          "label": "safe",
+          "tag": "undirected_profanity",
+          "verdict": "flagged",
+          "note": "model=toxicity=0.95"
+        },
+        {
+          "text": "that concert was fucking amazing",
+          "label": "safe",
+          "tag": "undirected_profanity",
+          "verdict": "flagged",
+          "note": "model=obscene=0.95"
+        },
+        {
+          "text": "holy shit, we won!",
+          "label": "safe",
+          "tag": "undirected_profanity",
+          "verdict": "flagged",
+          "note": "model=toxicity=0.94"
+        },
+        {
+          "text": "damn, i forgot my keys again",
+          "label": "safe",
+          "tag": "undirected_profanity",
+          "verdict": "flagged",
+          "note": "model=toxicity=0.97"
+        },
+        {
+          "text": "what the fuck happened to the wifi",
+          "label": "safe",
+          "tag": "undirected_profanity",
+          "verdict": "flagged",
+          "note": "model=toxicity=0.95"
+        },
+        {
+          "text": "this exam was a bitch",
+          "label": "safe",
+          "tag": "undirected_profanity",
+          "verdict": "flagged",
+          "note": "model=toxicity=0.99"
+        },
+        {
+          "text": "shit, i'm late",
+          "label": "safe",
+          "tag": "undirected_profanity",
+          "verdict": "flagged",
+          "note": "model=toxicity=0.92"
+        },
+        {
+          "text": "fuck yeah, payday!",
+          "label": "safe",
+          "tag": "undirected_profanity",
+          "verdict": "flagged",
+          "note": "model=toxicity=0.97"
+        },
+        {
+          "text": "i'm so fucking tired today",
+          "label": "safe",
+          "tag": "undirected_profanity",
+          "verdict": "flagged",
+          "note": "model=toxicity=0.95"
+        },
+        {
+          "text": "this pizza is damn good",
+          "label": "safe",
+          "tag": "undirected_profanity",
+          "verdict": "review",
+          "note": "model=toxicity=0.64"
+        },
+        {
+          "text": "oh crap, the bus left",
+          "label": "safe",
+          "tag": "undirected_profanity",
+          "verdict": "flagged",
+          "note": "model=toxicity=0.91"
+        },
+        {
+          "text": "my code is a shitshow today lol",
+          "label": "safe",
+          "tag": "undirected_profanity",
+          "verdict": "flagged",
+          "note": "model=toxicity=0.93"
+        },
+        {
+          "text": "Calling someone a loser online is bullying. Please stop.",
+          "label": "safe",
+          "tag": "news_counterspeech",
+          "verdict": "flagged",
+          "note": "model=toxicity=0.74"
+        },
+        {
+          "text": "if someone tells you to kill yourself, report it and talk to someone you trust",
+          "label": "safe",
+          "tag": "news_counterspeech",
+          "verdict": "flagged",
+          "note": "model=toxicity=0.84"
+        },
+        {
+          "text": "I'm a proud gay man and I'm tired of hate",
+          "label": "safe",
+          "tag": "news_counterspeech",
+          "verdict": "flagged",
+          "note": "model=identity_attack=0.71"
+        },
+        {
+          "text": "that exam was stupid hard",
+          "label": "safe",
+          "tag": "borderline",
+          "verdict": "flagged",
+          "note": "model=toxicity=0.99"
+        },
+        {
+          "text": "you're crazy lol, that was so funny",
+          "label": "safe",
+          "tag": "borderline",
+          "verdict": "flagged",
+          "note": "model=toxicity=0.83"
+        },
+        {
+          "text": "lol shut up, no way that happened",
+          "label": "safe",
+          "tag": "borderline",
+          "verdict": "flagged",
+          "note": "model=toxicity=0.80"
+        },
+        {
+          "text": "this game sucks",
+          "label": "safe",
+          "tag": "borderline",
+          "verdict": "flagged",
+          "note": "model=toxicity=0.95"
+        },
+        {
+          "text": "you're going to kill it on stage tonight",
+          "label": "safe",
+          "tag": "borderline",
+          "verdict": "flagged",
+          "note": "model=toxicity=0.95"
+        },
+        {
+          "text": "I'm such an idiot, I left my wallet at home",
+          "label": "safe",
+          "tag": "borderline",
+          "verdict": "flagged",
+          "note": "model=toxicity=0.99"
+        },
+        {
+          "text": "stop being lame and come to the party",
+          "label": "safe",
+          "tag": "borderline",
+          "verdict": "review",
+          "note": "model=toxicity=0.49"
+        },
+        {
+          "text": "this song is a total bop, you fool",
+          "label": "safe",
+          "tag": "borderline",
+          "verdict": "flagged",
+          "note": "model=toxicity=0.99"
+        },
+        {
+          "text": "you dumbo, you forgot the snacks haha",
+          "label": "safe",
+          "tag": "borderline",
+          "verdict": "flagged",
+          "note": "model=toxicity=0.74"
+        }
+      ]
+    },
+    {
+      "name": "rules + model",
+      "messages": 179,
+      "harmful": 107,
+      "safe": 72,
+      "catch_rate": 0.7476635514018691,
+      "sent_to_review": 0.8411214953271028,
+      "false_alarm_rate": 0.05555555555555555,
+      "review_load": 0.2638888888888889,
+      "by_tag": {
+        "direct_insult": {
+          "label": "harmful",
+          "n": 25,
+          "flagged": 23,
+          "review": 1,
+          "safe": 1
+        },
+        "directed_profanity": {
+          "label": "harmful",
+          "n": 15,
+          "flagged": 15,
+          "review": 0,
+          "safe": 0
+        },
+        "obfuscated": {
+          "label": "harmful",
+          "n": 25,
+          "flagged": 24,
+          "review": 0,
+          "safe": 1
+        },
+        "threat": {
+          "label": "harmful",
+          "n": 12,
+          "flagged": 7,
+          "review": 2,
+          "safe": 3
+        },
+        "self_harm": {
+          "label": "harmful",
+          "n": 8,
+          "flagged": 4,
+          "review": 0,
+          "safe": 4
+        },
+        "hate": {
+          "label": "harmful",
+          "n": 12,
+          "flagged": 6,
+          "review": 5,
+          "safe": 1
+        },
+        "no_keywords": {
+          "label": "harmful",
+          "n": 10,
+          "flagged": 1,
+          "review": 2,
+          "safe": 7
+        },
+        "everyday": {
+          "label": "safe",
+          "n": 21,
+          "flagged": 0,
+          "review": 2,
+          "safe": 19
+        },
+        "undirected_profanity": {
+          "label": "safe",
+          "n": 12,
+          "flagged": 0,
+          "review": 1,
+          "safe": 11
+        },
+        "lookalike": {
+          "label": "safe",
+          "n": 15,
+          "flagged": 0,
+          "review": 2,
+          "safe": 13
+        },
+        "news_counterspeech": {
+          "label": "safe",
+          "n": 12,
+          "flagged": 2,
+          "review": 6,
+          "safe": 4
+        },
+        "borderline": {
+          "label": "safe",
+          "n": 12,
+          "flagged": 2,
+          "review": 8,
+          "safe": 2
+        }
+      },
+      "errors": [
+        {
+          "text": "imagine being this dumb",
+          "label": "harmful",
+          "tag": "direct_insult",
+          "verdict": "review",
+          "note": "matched=['dumb'] model=toxicity=0.99"
+        },
+        {
+          "text": "everyone in class thinks you're a joke",
+          "label": "harmful",
+          "tag": "direct_insult",
+          "verdict": "safe",
+          "note": "matched=[] model=toxicity=0.24"
+        },
+        {
+          "text": "sh!t for brains",
+          "label": "harmful",
+          "tag": "obfuscated",
+          "verdict": "safe",
+          "note": "matched=['shit'] model=toxicity=0.75"
+        },
+        {
+          "text": "watch your back after school",
+          "label": "harmful",
+          "tag": "threat",
+          "verdict": "review",
+          "note": "matched=['watch your back'] model=toxicity=0.01"
+        },
+        {
+          "text": "i know where you live",
+          "label": "harmful",
+          "tag": "threat",
+          "verdict": "review",
+          "note": "matched=['i know where you live'] model=toxicity=0.00"
+        },
+        {
+          "text": "i'll beat you until you can't walk",
+          "label": "harmful",
+          "tag": "threat",
+          "verdict": "safe",
+          "note": "matched=[] model=toxicity=0.41"
+        },
+        {
+          "text": "i'll make you regret this",
+          "label": "harmful",
+          "tag": "threat",
+          "verdict": "safe",
+          "note": "matched=[] model=toxicity=0.00"
+        },
+        {
+          "text": "you'd better sleep with one eye open",
+          "label": "harmful",
+          "tag": "threat",
+          "verdict": "safe",
+          "note": "matched=[] model=toxicity=0.04"
+        },
+        {
+          "text": "nobody would miss you if you were gone",
+          "label": "harmful",
+          "tag": "self_harm",
+          "verdict": "safe",
+          "note": "matched=[] model=toxicity=0.12"
+        },
+        {
+          "text": "the world would be better without you",
+          "label": "harmful",
+          "tag": "self_harm",
+          "verdict": "safe",
+          "note": "matched=[] model=toxicity=0.18"
+        },
+        {
+          "text": "just end it already",
+          "label": "harmful",
+          "tag": "self_harm",
+          "verdict": "safe",
+          "note": "matched=[] model=toxicity=0.03"
+        },
+        {
+          "text": "do everyone a favour and disappear forever",
+          "label": "harmful",
+          "tag": "self_harm",
+          "verdict": "safe",
+          "note": "matched=[] model=toxicity=0.34"
+        },
+        {
+          "text": "all of those people are animals and should be wiped out",
+          "label": "harmful",
+          "tag": "hate",
+          "verdict": "review",
+          "note": "matched=[] model=toxicity=0.99"
+        },
+        {
+          "text": "go back to where you came from",
+          "label": "harmful",
+          "tag": "hate",
+          "verdict": "safe",
+          "note": "matched=[] model=toxicity=0.13"
+        },
+        {
+          "text": "women are too stupid to vote",
+          "label": "harmful",
+          "tag": "hate",
+          "verdict": "review",
+          "note": "matched=['stupid'] model=toxicity=0.99"
+        },
+        {
+          "text": "you people are a disease",
+          "label": "harmful",
+          "tag": "hate",
+          "verdict": "review",
+          "note": "matched=[] model=toxicity=0.97"
+        },
+        {
+          "text": "he's a terrorist because of his religion",
+          "label": "harmful",
+          "tag": "hate",
+          "verdict": "review",
+          "note": "matched=['terrorist'] model=toxicity=0.94"
+        },
+        {
+          "text": "join the jihadist cause and become a martyr, kill the infidels",
+          "label": "harmful",
+          "tag": "hate",
+          "verdict": "review",
+          "note": "matched=['jihadist'] model=toxicity=0.97"
+        },
+        {
+          "text": "no one will ever love you",
+          "label": "harmful",
+          "tag": "no_keywords",
+          "verdict": "safe",
+          "note": "matched=[] model=toxicity=0.10"
+        },
+        {
+          "text": "you're a waste of oxygen",
+          "label": "harmful",
+          "tag": "no_keywords",
+          "verdict": "review",
+          "note": "matched=[] model=toxicity=0.97"
+        },
+        {
+          "text": "everyone laughs at you behind your back",
+          "label": "harmful",
+          "tag": "no_keywords",
+          "verdict": "safe",
+          "note": "matched=[] model=toxicity=0.58"
+        },
+        {
+          "text": "your parents must be so ashamed of you",
+          "label": "harmful",
+          "tag": "no_keywords",
+          "verdict": "safe",
+          "note": "matched=[] model=toxicity=0.28"
+        },
+        {
+          "text": "you look like something the cat dragged in",
+          "label": "harmful",
+          "tag": "no_keywords",
+          "verdict": "safe",
+          "note": "matched=[] model=toxicity=0.02"
+        },
+        {
+          "text": "you have the brain of a goldfish",
+          "label": "harmful",
+          "tag": "no_keywords",
+          "verdict": "review",
+          "note": "matched=[] model=toxicity=0.59"
+        },
+        {
+          "text": "nobody invited you, leave",
+          "label": "harmful",
+          "tag": "no_keywords",
+          "verdict": "safe",
+          "note": "matched=[] model=toxicity=0.01"
+        },
+        {
+          "text": "you'll never amount to anything",
+          "label": "harmful",
+          "tag": "no_keywords",
+          "verdict": "safe",
+          "note": "matched=[] model=toxicity=0.01"
+        },
+        {
+          "text": "you should be embarrassed to even exist",
+          "label": "harmful",
+          "tag": "no_keywords",
+          "verdict": "safe",
+          "note": "matched=[] model=toxicity=0.31"
+        },
+        {
+          "text": "we killed it at the concert last night",
+          "label": "safe",
+          "tag": "everyday",
+          "verdict": "review",
+          "note": "matched=[] model=toxicity=0.61"
+        },
+        {
+          "text": "that movie was the bomb",
+          "label": "safe",
+          "tag": "everyday",
+          "verdict": "review",
+          "note": "matched=['bomb'] model=toxicity=0.01"
+        },
+        {
+          "text": "this exam was a bitch",
+          "label": "safe",
+          "tag": "undirected_profanity",
+          "verdict": "review",
+          "note": "matched=['bitch'] model=toxicity=0.99"
+        },
+        {
+          "text": "mad respect for the volunteers",
+          "label": "safe",
+          "tag": "lookalike",
+          "verdict": "review",
+          "note": "matched=['mad'] model=toxicity=0.00"
+        },
+        {
+          "text": "i'm mad at myself for missing the bus",
+          "label": "safe",
+          "tag": "lookalike",
+          "verdict": "review",
+          "note": "matched=['mad'] model=toxicity=0.01"
+        },
+        {
+          "text": "The news covered the Boko Haram kidnapping in the north today.",
+          "label": "safe",
+          "tag": "news_counterspeech",
+          "verdict": "review",
+          "note": "matched=['boko haram', 'kidnapping'] model=toxicity=0.00"
+        },
+        {
+          "text": "Calling someone a loser online is bullying. Please stop.",
+          "label": "safe",
+          "tag": "news_counterspeech",
+          "verdict": "flagged",
+          "note": "matched=['loser'] model=toxicity=0.74"
+        },
+        {
+          "text": "the documentary explains how ISIS recruited online",
+          "label": "safe",
+          "tag": "news_counterspeech",
+          "verdict": "review",
+          "note": "matched=['isis'] model=toxicity=0.00"
+        },
+        {
+          "text": "my grandfather fought against the nazis",
+          "label": "safe",
+          "tag": "news_counterspeech",
+          "verdict": "review",
+          "note": "matched=['nazi'] model=toxicity=0.04"
+        },
+        {
+          "text": "police arrested a gunman after the attack",
+          "label": "safe",
+          "tag": "news_counterspeech",
+          "verdict": "review",
+          "note": "matched=['gunman'] model=toxicity=0.01"
+        },
+        {
+          "text": "if someone tells you to kill yourself, report it and talk to someone you trust",
+          "label": "safe",
+          "tag": "news_counterspeech",
+          "verdict": "flagged",
+          "note": "matched=['kill yourself'] model=toxicity=0.84"
+        },
+        {
+          "text": "the hostage situation ended peacefully",
+          "label": "safe",
+          "tag": "news_counterspeech",
+          "verdict": "review",
+          "note": "matched=['hostage'] model=toxicity=0.00"
+        },
+        {
+          "text": "I'm a proud gay man and I'm tired of hate",
+          "label": "safe",
+          "tag": "news_counterspeech",
+          "verdict": "review",
+          "note": "matched=[] model=identity_attack=0.71"
+        },
+        {
+          "text": "that exam was stupid hard",
+          "label": "safe",
+          "tag": "borderline",
+          "verdict": "review",
+          "note": "matched=['stupid'] model=toxicity=0.99"
+        },
+        {
+          "text": "you're crazy lol, that was so funny",
+          "label": "safe",
+          "tag": "borderline",
+          "verdict": "review",
+          "note": "matched=[] model=toxicity=0.83"
+        },
+        {
+          "text": "lol shut up, no way that happened",
+          "label": "safe",
+          "tag": "borderline",
+          "verdict": "review",
+          "note": "matched=[] model=toxicity=0.80"
+        },
+        {
+          "text": "this game sucks",
+          "label": "safe",
+          "tag": "borderline",
+          "verdict": "review",
+          "note": "matched=['suck'] model=toxicity=0.95"
+        },
+        {
+          "text": "you're going to kill it on stage tonight",
+          "label": "safe",
+          "tag": "borderline",
+          "verdict": "review",
+          "note": "matched=[] model=toxicity=0.95"
+        },
+        {
+          "text": "I'm such an idiot, I left my wallet at home",
+          "label": "safe",
+          "tag": "borderline",
+          "verdict": "review",
+          "note": "matched=['idiot'] model=toxicity=0.99"
+        },
+        {
+          "text": "stop being lame and come to the party",
+          "label": "safe",
+          "tag": "borderline",
+          "verdict": "review",
+          "note": "matched=['lame'] model=toxicity=0.49"
+        },
+        {
+          "text": "ugh I look so ugly in this photo",
+          "label": "safe",
+          "tag": "borderline",
+          "verdict": "review",
+          "note": "matched=['ugly'] model=toxicity=0.31"
+        },
+        {
+          "text": "this song is a total bop, you fool",
+          "label": "safe",
+          "tag": "borderline",
+          "verdict": "flagged",
+          "note": "matched=['fool'] model=toxicity=0.99"
+        },
+        {
+          "text": "you dumbo, you forgot the snacks haha",
+          "label": "safe",
+          "tag": "borderline",
+          "verdict": "flagged",
+          "note": "matched=['dumbo'] model=toxicity=0.74"
+        }
+      ],
+      "ms_per_message": 18.328
+    }
+  ],
+  "performance": {
+    "rules_ms_per_message": 0.222,
+    "model": "detoxify-unbiased",
+    "load_seconds": 10.7,
+    "model_memory_mb": 799,
+    "ms_per_message_by_batch_size": {
+      "1": 43.93,
+      "8": 14.7,
+      "32": 46.84,
+      "64": 13.58
+    },
+    "process_memory_mb": 858
+  }
+}

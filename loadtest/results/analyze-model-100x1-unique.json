@@ -1,0 +1,18 @@
+{
+  "mode": "analyze (synchronous, micro-batched)",
+  "streams": 100,
+  "rate_per_stream": 1.0,
+  "duration_s": 20.0,
+  "sent": 1987,
+  "answered": 901,
+  "errors": 0,
+  "throughput_msg_s": 45.0,
+  "round_trip_ms": {
+    "p50": 5572.4,
+    "p95": 9784.1,
+    "p99": 11366.5,
+    "mean": 5029.4
+  },
+  "client_processes": 1,
+  "connect_failures": 0
+}

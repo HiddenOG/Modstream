@@ -37,6 +37,12 @@ TEXTS = [
 ]
 
 
+def message() -> str:
+    """A sample sentence plus a random tag: real chat messages are almost all unique, and
+    repeating texts would let the server's result cache hide the model's true cost."""
+    return f"{random.choice(TEXTS)} #{random.randrange(10**9)}"
+
+
 @dataclass
 class Run:
     total: int
@@ -113,7 +119,7 @@ async def analyze_stream(url: str, rate: float, run: Run, stats: Stats):
     try:
         while run.running:
             pending[str(n)] = time.perf_counter()
-            await ws.send(json.dumps({"type": "analyze", "ref": str(n), "text": random.choice(TEXTS), "record": False}))
+            await ws.send(json.dumps({"type": "analyze", "ref": str(n), "text": message(), "record": False}))
             stats.sent += 1
             n += 1
             await asyncio.sleep(1 / rate)
@@ -136,7 +142,7 @@ async def publish_stream(url: str, rate: float, run: Run, stats: Stats, channel:
     await asyncio.sleep(random.random() / rate)
     try:
         while run.running:
-            frame = {"type": "publish", "channel": channel, "author": "load", "text": random.choice(TEXTS)}
+            frame = {"type": "publish", "channel": channel, "author": "load", "text": message()}
             await ws.send(json.dumps(frame))
             stats.sent += 1
             await asyncio.sleep(1 / rate)
