@@ -1,4 +1,5 @@
 .git
+.github
 .venv
 venv
 instance
@@ -8,3 +9,5 @@ __pycache__
 .pytest_cache
 .ruff_cache
 tests
+loadtest
+docs

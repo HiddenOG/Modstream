@@ -1,0 +1,20 @@
+{
+  "mode": "pipeline (queue -> workers -> fan-out)",
+  "streams": 2000,
+  "subscribers": 10,
+  "rate_per_stream": 1.0,
+  "duration_s": 20.0,
+  "published": 39840,
+  "verdicts_per_subscriber": 27321,
+  "throughput_msg_s": 1366.0,
+  "fanout_deliveries_s": 13660.5,
+  "dropped_for_slow_subscribers": 0,
+  "end_to_end_ms": {
+    "p50": 5637.8,
+    "p95": 11064.1,
+    "p99": 11249.5,
+    "mean": 5885.4
+  },
+  "client_processes": 3,
+  "connect_failures": 0
+}

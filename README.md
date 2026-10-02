@@ -1,131 +1,126 @@
 # CyberShield
 
-**Real-time detection of cyberbullying, hate speech and violent extremism, with explainable verdicts.**
+**Real-time moderation for high-volume message streams: cyberbullying, hate speech and violent extremism, with explainable verdicts.**
 
-CyberShield scores posts, comments and messages with a hybrid pipeline (a curated rule layer plus a BERT toxicity model) and turns the result into product actions: pre-send nudges, content-warning interstitials, a human review queue and a live moderator console.
+CyberShield scores chats, posts and comments with a hybrid pipeline (a curated rule layer plus a BERT toxicity model) and turns the result into product actions: pre-send nudges, content-warning interstitials, a human review queue and a live moderator console. The serving layer is built for **thousands of concurrent streams**: async I/O, dynamic micro-batching, Redis Streams worker pools and per-node fan-out.
 
-![Home](docs/screenshots/home.png)
+- **7,772 msg/s** across **2,000 concurrent WebSocket streams**, with zero errors and p99 165 ms ([load test results](loadtest/RESULTS.md))
+- **At-least-once** stream processing, with idempotent storage, crash recovery and a dead-letter queue
+- **84 tests**, including broker tests against both backends; a CI integration job runs the suite against real Redis 7 and Postgres 16
+
+![Live monitor](docs/screenshots/monitor.png)
 
 | Analyzer | Chat guard nudge |
 |---|---|
 | ![Analyzer](docs/screenshots/analyzer.png) | ![Chat nudge](docs/screenshots/chat-nudge.png) |
 
-| Sandbox feed | Live monitor |
-|---|---|
-| ![Feed](docs/screenshots/feed.png) | ![Monitor](docs/screenshots/monitor.png) |
-
-## Features
-
-- **Analyzer**: a verdict, a 0–1 risk score, per-category model scores and the exact phrases that triggered it, highlighted in the original text.
-- **Sandbox social feed**: authors are nudged before posting something hurtful. Flagged posts are blurred behind a content warning instead of being silently deleted.
-- **Chat guard**: scores your draft as you type (debounced) and asks "are you sure?" before sending.
-- **Live monitor**: a moderator console fed by Server-Sent Events, with filters, pause/resume and live counters.
-- **Versioned REST API** with batch scoring, a consistent error format and a health endpoint.
-- **Responsive, accessible UI** with light/dark themes. It works without JavaScript and is progressively enhanced with ES modules.
-
 ## Architecture
 
 ```
-Browser (Jinja + ES modules)
-   │  HTML forms            │  fetch /api/v1/*        │  EventSource /api/v1/stream
-   ▼                        ▼                         ▼
-┌────────── Flask app factory ───────────────────────────────────────────┐
-│  pages blueprint        api blueprint                                  │
-│        └──────────┬─────────┘                                          │
-│               services  (validation, upload sniffing, use cases)       │
-│                   │                                                    │
-│   Detector ── normalize → lexicon (tiered) → Scorer (Detoxify) → policy│
-│                   │            LRU cache, batch inference, lazy warm-up │
-│   SQLite (WAL) ── posts · comments · scans (metadata only) · events    │
-└────────────────────────────────────────────────────────────────────────┘
+ producers ──HTTP / WebSocket──►  API nodes (FastAPI + uvicorn, stateless, N replicas)
+                                   │  sync path:  /analyze, WS "analyze" ─► MicroBatcher ─► model
+                                   │  async path: /messages, WS "publish" ─► XADD ─┐
+                                   │                                                ▼
+                                   │                        Redis Stream  cs:messages
+                                   │                        (consumer group, at-least-once)
+                                   │                                                │
+                                   │               workers (N replicas): batch read ─► model
+                                   │               ─► idempotent bulk insert ─► publish ─► XACK
+                                   │               (XAUTOCLAIM recovery, dead-letter queue)
+                                   │                                                │
+ viewers ◄──SSE / WebSocket──── Hub ◄──────────── Redis Stream  cs:events ◄─────────┘
+                                   │
+                         Postgres (SQLAlchemy async) · Redis counters · Prometheus → Grafana
 ```
 
-| Path | Responsibility |
-|---|---|
-| [cybershield/detector.py](cybershield/detector.py) | Normalization, word-boundary matching, the pluggable `Scorer` protocol and the verdict policy |
-| [cybershield/lexicon.py](cybershield/lexicon.py) | Curated term lists, split into *strong* and *contextual* tiers |
-| [cybershield/services.py](cybershield/services.py) | Use cases shared by pages and the API |
-| [cybershield/db.py](cybershield/db.py) | SQLite schema, queries and the event outbox behind the live stream |
-| [cybershield/api.py](cybershield/api.py) | `/api/v1` JSON API + SSE |
-| [cybershield/pages.py](cybershield/pages.py) | Server-rendered pages; legacy URLs redirect |
+**Two paths, two contracts:**
+
+| | Synchronous | Asynchronous |
+|---|---|---|
+| Use for | Pre-send checks, the analyzer, chat guard | Chat platforms piping in every message |
+| Entry | `POST /api/v1/analyze`, WS `analyze` frames | `POST /api/v1/messages`, WS `publish` frames |
+| Guarantee | Answer in the response; 503 + `Retry-After` when overloaded | Durable, at-least-once; bursts queue instead of failing |
+| Scales with | API replicas | Worker replicas (independently) |
 
 ### Design decisions
 
-- **Hybrid detection.** The rules are fast, precise and explainable; the model catches what the rules miss. *Contextual* terms ("stupid", "bomb", extremist group names) only escalate to a flag when the model agrees. On their own they go to human review, which cuts false positives like "heart attack" or news coverage.
-- **Evasion-resistant without losing explainability.** Leetspeak (`1d10t`, `$tup1d`) is normalized with a 1:1 character map, so match offsets still point at the original text for highlighting.
-- **Bias-aware lexicon.** Purely religious vocabulary is deliberately excluded. Flagging it penalizes ordinary speech and is a known failure mode of moderation systems.
-- **Transactional outbox for streaming.** Every write appends to an `events` table. The SSE endpoint streams by id, so clients resume with `Last-Event-ID` and the stream works across workers. Connections are recycled after 5 minutes so worker threads are never held forever.
-- **Privacy by default.** Analyzer and chat text is never stored; only verdict metadata is logged for stats.
-- **Testable ML.** The model sits behind a `Scorer` protocol. Tests inject a deterministic fake, so CI runs in seconds without PyTorch.
+- **Dynamic micro-batching.** A transformer costs about the same for 1 text as for 32. The [batcher](cybershield/batching.py) holds each request for at most 5 ms so concurrent users and streams share one forward pass, run on a dedicated inference thread so the event loop never blocks.
+- **Redis Streams over Kafka.** Consumer groups, acknowledgements, pending-entry recovery and capped logs, in infrastructure a small team can run. The [broker](cybershield/broker.py) sits behind an interface with an in-memory implementation that has the same semantics, so the app runs with zero infrastructure in development.
+- **At-least-once + idempotency.** Workers acknowledge only after storing and publishing; inserts are keyed on the stream entry id, so redelivery after a crash never duplicates rows ([worker](cybershield/worker.py)).
+- **Fan-out without per-viewer cost.** Each API node tails the event log once and fans out to local subscribers through bounded queues. Events are serialized once, not per subscriber. Slow viewers get a `lagged` notice instead of stalling everyone, and can replay the durable log with `Last-Event-ID` ([hub](cybershield/hub.py)).
+- **Load shedding.** A full batch queue returns 503 with `Retry-After` instead of letting latency grow without bound.
+- **Explainable, bias-aware detection.** Word-boundary matching with leetspeak normalization that keeps original offsets for highlighting; *contextual* terms only flag when the model agrees; purely religious vocabulary is deliberately excluded ([detector](cybershield/detector.py)).
+- **Privacy by default.** Analyzer and chat text is never stored; dashboards use counters, not content.
+
+## Quick start
+
+**Zero infrastructure** (in-memory broker, SQLite, embedded worker):
+
+```bash
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -r requirements-dev.txt                  # no PyTorch
+CS_SCORER=none python -m cybershield api             # http://127.0.0.1:8000  · API docs at /docs
+```
+
+Install `requirements.txt` instead to add the Detoxify model.
+
+**Full stack** (API, worker pool, Redis, Postgres, Prometheus, Grafana):
+
+```bash
+docker compose up --build              # app :8000 · Grafana :3000 · Prometheus :9090
+docker compose up --scale worker=4     # more moderation throughput
+```
 
 ## API
 
-| Method | Endpoint | Description |
-|---|---|---|
-| POST | `/api/v1/analyze` | `{"text": "..."}` → verdict, risk, categories, reasons, matches, model scores |
-| POST | `/api/v1/analyze/batch` | Up to 32 texts in one model forward pass |
-| GET/POST | `/api/v1/posts` | List posts / create a post (JSON or multipart with image) |
-| POST | `/api/v1/posts/:id/comments` | Add a comment |
-| POST | `/api/v1/posts/:id/reactions` | `{"kind": "like" \| "share"}` |
-| GET | `/api/v1/stream` | Server-Sent Events of new posts and comments (resumable) |
-| GET | `/api/v1/stats` | Aggregate counts, flag rate, latency, categories |
-| GET | `/api/v1/health` | Liveness, version and model readiness |
+Interactive OpenAPI docs are served at `/docs`. Highlights:
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /api/v1/analyze` | One text → verdict, risk, categories, reasons, highlighted matches |
+| `POST /api/v1/analyze/batch` | Up to 256 texts |
+| `POST /api/v1/messages` | Enqueue up to 1,000 stream messages (202 Accepted) |
+| `GET /api/v1/stream` | SSE of verdicts; `?channel=` and `?verdict=` filters; resumable |
+| `WS /api/v1/ws` | Bidirectional: `analyze`, `publish`, `subscribe`, `ping` frames |
+| `GET /api/v1/health` · `/ready` · `/metrics` | Liveness, readiness (model, broker, DB), Prometheus |
 
 ```bash
-curl -s localhost:5000/api/v1/analyze -H "Content-Type: application/json" \
-  -d '{"text": "ur such an 1d10t"}'
+curl -s localhost:8000/api/v1/analyze -H "Content-Type: application/json" -d '{"text": "ur such an 1d10t"}'
 ```
 
-## Running locally
+## Configuration
 
-**Docker (full ML stack, model weights baked into the image):**
-
-```bash
-docker compose up --build        # http://localhost:8000
-```
-
-**Python 3.10+:**
-
-```bash
-python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
-pip install -r requirements.txt  # includes PyTorch + Detoxify
-python app.py                    # http://127.0.0.1:5000
-```
-
-**Lightweight mode (rules only, no PyTorch download):**
-
-```bash
-pip install -r requirements-dev.txt
-CYBERSHIELD_SCORER=none python app.py
-```
-
-### Configuration
+All settings are environment variables prefixed with `CS_` ([config.py](cybershield/config.py)):
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `CYBERSHIELD_SCORER` | `auto` | `auto`, `detoxify` or `none` (rules only) |
-| `FLAG_THRESHOLD` / `REVIEW_THRESHOLD` | `0.7` / `0.4` | Model score cut-offs for the verdict policy |
-| `DATABASE_PATH` | `instance/cybershield.db` | SQLite file |
-| `UPLOAD_FOLDER` | `instance/uploads` | Uploaded images (validated by magic bytes, renamed) |
-| `SECRET_KEY` | random | Flask session signing |
+| `CS_REDIS_URL` | unset | Unset = in-memory broker (single process) |
+| `CS_DATABASE_URL` | SQLite in `instance/` | e.g. `postgresql+asyncpg://…` |
+| `CS_RUN_WORKER` | `true` | Embed a worker in the API process; `false` when workers run separately |
+| `CS_SCORER` | `auto` | `auto`, `detoxify` or `none` (rules only) |
+| `CS_BATCH_MAX_SIZE` / `CS_BATCH_MAX_WAIT_MS` | `32` / `5` | Micro-batching window |
+| `CS_FLAG_THRESHOLD` / `CS_REVIEW_THRESHOLD` | `0.7` / `0.4` | Verdict policy |
+| `CS_SECRET_KEY` | random | **Required** when `CS_ENV=prod` (shared across processes) |
 
-## Tests & quality
+## Testing & load testing
 
 ```bash
-pip install -r requirements-dev.txt
-ruff check .
-pytest
+ruff check . && pytest                                   # unit + API tests, no infrastructure needed
+python loadtest/loadgen.py analyze --streams 1000 --rate 5 --procs 3
 ```
 
-The 46 tests cover the detector (boundaries, leetspeak, overlap resolution, policy tiers, caching, batching), the API (validation, error shapes, upload sniffing, SSE replay and resume) and the pages (rendering, XSS escaping, legacy redirects, security headers). GitHub Actions runs lint and tests on Python 3.10 and 3.12, then builds the Docker image.
+The tests cover the detector, the micro-batcher (coalescing, load shedding), both broker backends (crash recovery, dead-lettering, resumable logs), the worker (idempotency, poison messages), the hub (filters, slow consumers, 5,000 subscribers), and the API, WebSocket and SSE protocols end to end. See [loadtest/RESULTS.md](loadtest/RESULTS.md) for the benchmark methodology, the numbers, and the profiling that took capacity from 635 to 7,772 msg/s.
+
+## Roadmap
+
+Phases 1–5 are done; next are ONNX/int8 inference, an LLM review tier, a multi-tenant API and Kubernetes autoscaling on queue lag. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Limitations
 
-- Sarcasm, quotes and reclaimed language remain hard; that's why ambiguous content is routed to review rather than auto-removed.
-- Toxicity models trained on Jigsaw data are known to over-flag mentions of some identity groups.
+- Sarcasm, quotes and reclaimed language are hard; ambiguous content is routed to review, not auto-removed.
+- Jigsaw-trained toxicity models over-flag mentions of some identity groups.
 - English-first, with a few Nigerian Pidgin insults in the rule layer.
 
 ## Credits
 
-Originally built by Favour Aghogho as a Flask prototype; v2 is a full rebuild of the architecture and UI.
+Originally built by Favour Aghogho as a Flask prototype. v2 rebuilt the UI and architecture; v3 added the streaming platform.

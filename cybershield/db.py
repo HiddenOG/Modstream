@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 from datetime import UTC, datetime
 
@@ -20,6 +21,7 @@ from sqlalchemy import (
     select,
     update,
 )
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -112,9 +114,20 @@ def make_sessionmaker(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
     return async_sessionmaker(engine, expire_on_commit=False)
 
 
-async def create_schema(engine: AsyncEngine) -> None:
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+async def create_schema(engine: AsyncEngine, attempts: int = 5) -> None:
+    """Create missing tables. Safe when several processes or replicas boot at once:
+    a peer winning the race surfaces as "already exists", so we re-check and retry."""
+    for attempt in range(attempts):
+        try:
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+            return
+        except DBAPIError as exc:
+            if attempt == attempts - 1 or not any(
+                s in str(exc).lower() for s in ("already exists", "duplicate key", "database is locked")
+            ):
+                raise
+            await asyncio.sleep(0.2 * (attempt + 1))
 
 
 # --- Posts & comments ---------------------------------------------------------------

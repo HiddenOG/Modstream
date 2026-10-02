@@ -7,10 +7,11 @@ on:
 
 jobs:
   test:
+    name: Lint & unit tests (py${{ matrix.python-version }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.10", "3.12"]
+        python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -21,9 +22,38 @@ jobs:
       - run: ruff check .
       - run: pytest
 
-  docker:
+  integration:
+    name: Integration tests (Redis 7 + Postgres 16)
     runs-on: ubuntu-latest
-    needs: test
+    services:
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: --health-cmd "redis-cli ping" --health-interval 5s --health-retries 10
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: cybershield
+          POSTGRES_PASSWORD: cybershield
+          POSTGRES_DB: cybershield
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U cybershield" --health-interval 5s --health-retries 10
+    env:
+      CS_TEST_REDIS_URL: redis://localhost:6379/0
+      CS_TEST_DATABASE_URL: postgresql+asyncpg://cybershield:cybershield@localhost:5432/cybershield
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - run: pytest -o addopts="" -v
+
+  docker:
+    name: Docker image
+    runs-on: ubuntu-latest
+    needs: [test, integration]
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3

@@ -59,13 +59,22 @@ def _database_url(tmp_path) -> str:
     return f"sqlite+aiosqlite:///{(tmp_path / 'test.db').as_posix()}"
 
 
+def _redis_url() -> str | None:
+    url = os.environ.get("CS_TEST_REDIS_URL")  # real Redis in CI
+    if url:
+        import redis
+
+        redis.Redis.from_url(url).flushdb()
+    return url
+
+
 @pytest.fixture
 def settings(tmp_path):
     return Settings(
         env="test",
         secret_key="test",
         database_url=_database_url(tmp_path),
-        redis_url=None,
+        redis_url=_redis_url(),
         upload_dir=str(tmp_path / "uploads"),
         warmup=False,
         batch_max_wait_ms=2,

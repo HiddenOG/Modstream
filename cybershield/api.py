@@ -14,7 +14,7 @@ from pydantic import ValidationError
 
 from . import __version__
 from .batching import Overloaded
-from .hub import make_filter
+from .hub import HubEvent, make_filter
 from .schemas import (
     AnalysisOut,
     AnalyzeRequest,
@@ -100,10 +100,6 @@ async def simulate(body: SimulateIn, rt: RT):
     return {"started": True, "messages": total, "channels": body.channels, "rate": body.rate}
 
 
-def _sse(event_id: str, event: dict) -> str:
-    return f"id: {event_id}\nevent: {event['type']}\ndata: {json.dumps(event['data'])}\n\n"
-
-
 @router.get("/stream", name="api.stream", tags=["streams"])
 async def stream(
     request: Request,
@@ -129,10 +125,10 @@ async def stream(
             else:
                 history = await rt.broker.recent_events(settings.stream_backlog)
             seen = set()
-            for event_id, event in history:
-                seen.add(event_id)
-                if accept(event):
-                    yield _sse(event_id, event)
+            for entry in history:
+                seen.add(entry[0])
+                if accept(entry[1]):
+                    yield HubEvent(entry).sse
             deadline = time.monotonic() + settings.stream_max_seconds
             while (remaining := deadline - time.monotonic()) > 0:
                 entry = await sub.get(min(settings.stream_heartbeat_s, remaining))
@@ -140,8 +136,8 @@ async def stream(
                     yield f"event: lagged\ndata: {json.dumps({'dropped': dropped})}\n\n"
                 if entry is None:
                     yield ": keep-alive\n\n"
-                elif entry[0] not in seen:
-                    yield _sse(*entry)
+                elif entry.id not in seen:
+                    yield entry.sse
 
     return StreamingResponse(
         events(), media_type="text/event-stream",
@@ -160,7 +156,7 @@ async def websocket(ws: WebSocket):
     """
     rt: Runtime = ws.app.state.rt
     await ws.accept()
-    outbox: asyncio.Queue[dict] = asyncio.Queue(maxsize=1000)
+    outbox: asyncio.Queue[dict | str] = asyncio.Queue(maxsize=1000)
     inflight = asyncio.Semaphore(64)
     tasks: set[asyncio.Task] = set()
     subs = []
@@ -172,7 +168,8 @@ async def websocket(ws: WebSocket):
 
     async def writer():
         while True:
-            await ws.send_text(json.dumps(await outbox.get()))
+            frame = await outbox.get()
+            await ws.send_text(frame if isinstance(frame, str) else json.dumps(frame))
 
     async def do_analyze(frame: dict):
         async with inflight:
@@ -191,7 +188,7 @@ async def websocket(ws: WebSocket):
             if dropped := sub.take_dropped():
                 await outbox.put({"type": "lagged", "dropped": dropped})
             if entry is not None:
-                await outbox.put({"type": "event", "id": entry[0], "event": entry[1]})
+                await outbox.put(entry.ws)  # encoded once, shared by every subscriber
 
     writer_task = asyncio.create_task(writer())
     try:

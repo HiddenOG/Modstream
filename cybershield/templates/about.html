@@ -21,15 +21,16 @@
 
     <article class="prose" style="min-width: 0">
       <h2 id="architecture" style="margin-top: 0">Architecture</h2>
-      <p>A Flask application factory with two blueprints: server-rendered pages (which work without JavaScript) and a versioned JSON API that the progressively enhanced UI calls. Both go through one service layer.</p>
+      <p>Stateless FastAPI nodes serve pages, a versioned JSON API, Server-Sent Events and WebSockets. Moderation runs on two paths: a <strong>synchronous</strong> one for instant checks, where concurrent requests are micro-batched into shared model passes, and an <strong>asynchronous</strong> one for high-volume streams, where messages go through a Redis Streams queue to a worker pool that scales independently.</p>
       <div class="arch">
-        <div class="arch-col"><h4>{{ icon("code", "icon-sm") }} Client</h4><ul>
-          <li>Jinja templates + ES modules</li><li>Custom CSS design system</li><li>EventSource (SSE) live feed</li><li>Pre-send nudge dialog</li></ul></div>
-        <div class="arch-col"><h4>{{ icon("zap", "icon-sm") }} Service</h4><ul>
-          <li><code>pages</code> / <code>api</code> blueprints</li><li>Validation &amp; upload sniffing</li><li>Detector (rules + model)</li><li>LRU result cache</li></ul></div>
-        <div class="arch-col"><h4>{{ icon("database", "icon-sm") }} Data</h4><ul>
-          <li>SQLite in WAL mode</li><li>Event outbox → SSE stream</li><li>Metadata-only scan log</li><li>Uploads outside <code>static/</code></li></ul></div>
+        <div class="arch-col"><h4>{{ icon("code", "icon-sm") }} Edge</h4><ul>
+          <li>FastAPI + uvicorn (ASGI)</li><li>REST, SSE &amp; WebSocket</li><li>Micro-batcher → model</li><li>Fan-out hub per node</li><li>Load shedding (503)</li></ul></div>
+        <div class="arch-col"><h4>{{ icon("zap", "icon-sm") }} Pipeline</h4><ul>
+          <li>Redis Streams queue</li><li>Consumer-group workers</li><li>Crash recovery (XAUTOCLAIM)</li><li>Dead-letter queue</li><li>Capped, resumable event log</li></ul></div>
+        <div class="arch-col"><h4>{{ icon("database", "icon-sm") }} Data &amp; ops</h4><ul>
+          <li>Postgres (SQLAlchemy async)</li><li>Idempotent bulk inserts</li><li>Redis atomic counters</li><li>Prometheus + Grafana</li><li>Liveness / readiness probes</li></ul></div>
       </div>
+      <p>Measured on one laptop: <strong>7,772 msg/s across 2,000 concurrent streams</strong> with zero errors and p99 165 ms (rules-only mode; see <code>loadtest/RESULTS.md</code>).</p>
 
       <h2 id="detection">Detection pipeline</h2>
       <ol>
@@ -51,19 +52,22 @@
       <p class="muted small">Thresholds are configurable via the <code>FLAG_THRESHOLD</code> and <code>REVIEW_THRESHOLD</code> environment variables.</p>
 
       <h2 id="api">API reference</h2>
-      <p>All endpoints live under <code>/api/v1</code> and return JSON. Errors follow one shape: <code>{"error": {"code", "message", "field"}}</code>.</p>
+      <p>All endpoints live under <code>/api/v1</code> and return JSON; interactive OpenAPI docs are at <a href="/docs">/docs</a>, and Prometheus metrics at <code>/metrics</code>. Errors follow one shape: <code>{"error": {"code", "message", "field"}}</code>.</p>
       <div class="table-wrap"><table>
         <thead><tr><th>Endpoint</th><th>Description</th></tr></thead>
         <tbody>
           <tr><td><span class="method post">POST</span> <code>/analyze</code></td><td>Analyze one text. Body: <code>{"text": "…"}</code></td></tr>
-          <tr><td><span class="method post">POST</span> <code>/analyze/batch</code></td><td>Up to 32 texts in one model pass. Body: <code>{"texts": [...]}</code></td></tr>
+          <tr><td><span class="method post">POST</span> <code>/analyze/batch</code></td><td>Up to 256 texts. Body: <code>{"texts": [...]}</code></td></tr>
+          <tr><td><span class="method post">POST</span> <code>/messages</code></td><td>Enqueue up to 1,000 stream messages for the worker pool (202 Accepted)</td></tr>
+          <tr><td><span class="method">GET</span> <code>/messages</code></td><td>Moderated stream messages; filter by <code>channel</code> and <code>verdict</code></td></tr>
+          <tr><td><span class="method">WS</span> <code>/ws</code></td><td>Bidirectional frames: <code>analyze</code>, <code>publish</code>, <code>subscribe</code>, <code>ping</code></td></tr>
           <tr><td><span class="method">GET</span> <code>/posts</code></td><td>Recent feed posts with comments and analyses</td></tr>
           <tr><td><span class="method post">POST</span> <code>/posts</code></td><td>Create a post (JSON or multipart with <code>image</code>)</td></tr>
           <tr><td><span class="method post">POST</span> <code>/posts/:id/comments</code></td><td>Add a comment</td></tr>
           <tr><td><span class="method post">POST</span> <code>/posts/:id/reactions</code></td><td><code>{"kind": "like" | "share"}</code></td></tr>
-          <tr><td><span class="method">GET</span> <code>/stream</code></td><td>Server-Sent Events of new posts and comments. Resumable via <code>Last-Event-ID</code></td></tr>
+          <tr><td><span class="method">GET</span> <code>/stream</code></td><td>Server-Sent Events of verdicts for posts, comments and messages. Server-side <code>channel</code> / <code>verdict</code> filters; resumable via <code>Last-Event-ID</code></td></tr>
           <tr><td><span class="method">GET</span> <code>/stats</code></td><td>Aggregate counts, flag rate, latency, categories</td></tr>
-          <tr><td><span class="method">GET</span> <code>/health</code></td><td>Liveness, version and model readiness</td></tr>
+          <tr><td><span class="method">GET</span> <code>/health</code> · <code>/ready</code></td><td>Liveness; readiness checks model, broker and database</td></tr>
         </tbody>
       </table></div>
 <pre class="code"><code><span class="tok-c"># Analyze a message</span>
@@ -91,18 +95,17 @@ curl -s {{ request.base_url }}api/v1/analyze \
       </ul>
 
       <h2 id="run">Run it locally</h2>
-<pre class="code"><code><span class="tok-c"># Full stack with the ML model</span>
+<pre class="code"><code><span class="tok-c"># Full stack: API, workers, Redis, Postgres, Prometheus, Grafana</span>
 docker compose up --build
+docker compose up --scale worker=4
 
-<span class="tok-c"># Or with Python 3.10+</span>
-python -m venv .venv &amp;&amp; source .venv/bin/activate
-pip install -r requirements.txt
-python app.py
-
-<span class="tok-c"># Lightweight dev mode (rules only, no PyTorch download)</span>
+<span class="tok-c"># Zero infrastructure (in-memory broker, SQLite, rules only)</span>
 pip install -r requirements-dev.txt
-CYBERSHIELD_SCORER=none python app.py
-pytest</code></pre>
+CS_SCORER=none python -m cybershield api
+
+<span class="tok-c"># Tests and a 1,000-stream load test</span>
+pytest
+python loadtest/loadgen.py analyze --streams 1000 --rate 5 --procs 3</code></pre>
     </article>
   </div>
 </div>

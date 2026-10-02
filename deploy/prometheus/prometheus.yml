@@ -1,0 +1,15 @@
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: api
+    metrics_path: /metrics/
+    static_configs:
+      - targets: ["api:8000"]
+
+  # Docker DNS returns one A record per replica, so every worker is scraped.
+  - job_name: worker
+    dns_sd_configs:
+      - names: ["worker"]
+        type: A
+        port: 9100
