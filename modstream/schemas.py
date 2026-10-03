@@ -91,3 +91,7 @@ class SimulateIn(BaseModel):
     messages: int = Field(1000, ge=1, le=50_000)
     channels: int = Field(50, ge=1, le=5_000)
     rate: int = Field(2000, ge=1, le=50_000, description="Messages per second")
+
+
+class FeedIn(BaseModel):
+    messages: int = Field(5000, ge=1, le=50_000, description="How many real posts to pull")

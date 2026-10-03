@@ -61,3 +61,18 @@ async def test_many_subscribers():
         assert all(s.queue.qsize() == 1 for s in subs)
     finally:
         await hub.stop()
+
+
+async def test_flush_drops_buffered_events():
+    broker = MemoryBroker()
+    hub = Hub(broker, queue_size=100)
+    await hub.start()
+    try:
+        sub = hub.subscribe()
+        await broker.publish([event("a", "safe") for _ in range(5)])
+        await asyncio.sleep(0.05)
+        assert sub.queue.qsize() == 5
+        hub.flush()
+        assert sub.queue.qsize() == 0
+    finally:
+        await hub.stop()

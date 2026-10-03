@@ -10,7 +10,11 @@
       <p>Every post, comment and stream message is scored by the worker pool and pushed here over Server-Sent Events. Filters run server-side.</p>
     </div>
     <div class="row" style="--gap: 8px">
-      <button class="btn btn-sm" type="button" data-simulate>{{ icon("zap", "icon-sm") }}Simulate 5,000 messages</button>
+      <button class="btn btn-sm btn-primary" type="button" data-bluesky
+              title="Real, recent public Bluesky posts (English). Author names are anonymised.">{{ icon("activity", "icon-sm") }}5,000 real Bluesky posts</button>
+      <button class="btn btn-sm" type="button" data-simulate>{{ icon("zap", "icon-sm") }}Simulate 5,000</button>
+      <button class="btn btn-sm btn-ghost" type="button" data-reset
+              title="Stop running feeds and clear the queue, live events and counters">{{ icon("repeat", "icon-sm") }}Reset</button>
       <span class="status-pill" data-status><span class="dot"></span><span>Connecting…</span></span>
     </div>
   </header>
@@ -40,7 +44,7 @@
       <div class="empty" data-empty>
         {{ icon("activity") }}
         <div><strong style="color: var(--text)">Waiting for activity</strong><br>
-          <span class="small">Post in the <a href="{{ url_for('pages.feed') }}" target="_blank">feed</a>, or simulate traffic above.</span></div>
+          <span class="small">Pull real Bluesky posts or simulate traffic above, or post in the <a href="{{ url_for('pages.feed') }}" target="_blank">feed</a>.</span></div>
       </div>
     </div>
   </div>
@@ -144,16 +148,32 @@
     pauseBtn.querySelector("span").textContent = paused ? "Resume" : "Pause";
   });
 
-  document.querySelector("[data-simulate]").addEventListener("click", async (e) => {
-    const btn = e.currentTarget;
-    btn.classList.add("is-loading");
-    try {
-      await api("/simulate", { method: "POST", body: { messages: 5000, channels: 200, rate: 1000 } });
-    } catch (err) {
-      notice.textContent = err.message;
-    } finally {
-      setTimeout(() => btn.classList.remove("is-loading"), 800);
-    }
+  function onClick(selector, path, body, done) {
+    document.querySelector(selector).addEventListener("click", async (e) => {
+      const btn = e.currentTarget;
+      btn.classList.add("is-loading");
+      try {
+        await api(path, { method: "POST", body });
+        done?.();
+      } catch (err) {
+        notice.textContent = err.message;
+      } finally {
+        setTimeout(() => btn.classList.remove("is-loading"), 800);
+      }
+    });
+  }
+
+  onClick("[data-bluesky]", "/feeds/bluesky", { messages: 5000 },
+    () => { notice.textContent = "Pulling real Bluesky posts…"; });
+  onClick("[data-simulate]", "/simulate", { messages: 5000, channels: 200, rate: 1000 });
+  onClick("[data-reset]", "/demo/reset", {}, () => {
+    pending = [];
+    list.querySelectorAll(".event").forEach((el) => el.remove());
+    list.append(empty);
+    last = null;
+    document.querySelector("[data-rate]").textContent = "0";
+    notice.textContent = "Reset: queue, live events and counters cleared";
+    connect();  // a fresh connection drops anything still in transit on the old one
   });
 
   connect();

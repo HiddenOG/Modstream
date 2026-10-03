@@ -79,3 +79,22 @@ async def test_worker_loop_drains_queue(runtime):
     stop.set()
     await asyncio.wait_for(task, 5)
     assert len(await messages(runtime)) == 300
+
+
+async def test_batch_in_flight_during_reset_is_discarded(runtime, scorer):
+    await runtime.enqueue([MessageIn(text="hello"), MessageIn(text="you idiot")])
+    entries = await runtime.broker.consume("w", 10, 100)
+    start = await runtime.broker.last_event_id()
+
+    original = scorer.score
+
+    def score_then_reset(texts):
+        out = original(texts)
+        runtime.broker._generation += 1  # a reset lands while the model is running
+        return out
+
+    scorer.score = score_then_reset
+    await Worker(runtime, "w").process(entries)
+    assert await messages(runtime) == []
+    assert await runtime.broker.events_after(start, 10) == []
+    assert (await runtime.broker.queue_stats())["pending"] == 0
