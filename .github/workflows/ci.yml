@@ -51,15 +51,33 @@ jobs:
       - run: pytest -o addopts="" -v
 
   docker:
-    name: Docker image
+    name: Docker image (${{ matrix.variant.name }})
     runs-on: ubuntu-latest
     needs: [test, integration]
+    strategy:
+      matrix:
+        variant:
+          - { name: "with model", with_model: "true", engine: "detoxify-unbiased" }
+          - { name: "rules only", with_model: "false", engine: "lexicon-only" }
     steps:
       - uses: actions/checkout@v5
       - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v6
         with:
           context: .
-          push: false
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          load: true
+          tags: modstream:ci
+          build-args: WITH_MODEL=${{ matrix.variant.with_model }}
+          cache-from: type=gha,scope=${{ matrix.variant.with_model }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.variant.with_model }}
+      - name: Start the container on a host-assigned port and check the engine
+        run: |
+          docker run -d --name app -e PORT=9000 -p 9000:9000 modstream:ci
+          for i in $(seq 1 60); do curl -sf localhost:9000/api/v1/ready && break; sleep 2; done
+          curl -sf localhost:9000/api/v1/health | tee health.json
+          grep -q '"engine":"${{ matrix.variant.engine }}"' health.json
+          curl -sf -X POST localhost:9000/api/v1/analyze -H 'Content-Type: application/json' \
+            -d '{"text": "fuc your mom"}' | grep -q '"verdict":"flagged"'
+      - name: Container logs on failure
+        if: failure()
+        run: docker logs app
