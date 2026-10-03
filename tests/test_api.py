@@ -210,3 +210,34 @@ def test_timestamps_are_timezone_aware(client):
     for stamp in (listed["created_at"], listed["comments"][0]["created_at"], stored[0]["created_at"],
                   stored[0]["enqueued_at"]):
         assert stamp.endswith("+00:00"), stamp
+
+
+def test_demo_reset_stops_simulator_and_clears_stats(client):
+    client.post("/api/v1/analyze", json={"text": "hello"})
+    client.post("/api/v1/simulate", json={"messages": 50000, "channels": 10, "rate": 1000})
+    assert client.post("/api/v1/demo/reset").json() == {"reset": True}
+    stats = client.get("/api/v1/stats").json()
+    assert stats["scans"] == 0 and stats["queue"]["lag"] == 0
+    time.sleep(0.3)  # the cancelled simulator must not keep adding messages
+    assert client.get("/api/v1/stats").json()["queue"]["lag"] == 0
+
+
+def test_bluesky_feed_anonymises_authors(client):
+    async def fake_source(limit):
+        for i in range(limit):
+            yield f"did:plc:user{i % 3}", "you idiot" if i == 0 else f"lovely day number {i}"
+
+    client.app.state.rt.bluesky_source = fake_source
+    assert client.post("/api/v1/feeds/bluesky", json={"messages": 7}).status_code == 202
+    stored = wait_for(lambda: (m := client.get("/api/v1/messages", params={"channel": "bluesky"}).json()["messages"])
+                      and len(m) == 7 and m)
+    authors = {m["author"] for m in stored}
+    assert len(authors) == 3 and all(a.startswith("bsky-") and "did" not in a for a in authors)
+    assert sum(m["verdict"] == "flagged" for m in stored) == 1
+
+
+def test_demo_controls_can_be_disabled(settings, detector):
+    app = create_app(settings.model_copy(update={"enable_simulator": False}), detector=detector)
+    with TestClient(app) as client:
+        for path in ("/api/v1/demo/reset", "/api/v1/feeds/bluesky", "/api/v1/simulate"):
+            assert client.post(path, json={}).status_code == 400

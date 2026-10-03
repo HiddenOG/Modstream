@@ -21,6 +21,7 @@ from .schemas import (
     BatchAnalysisOut,
     BatchAnalyzeRequest,
     CommentIn,
+    FeedIn,
     MessagesAccepted,
     MessagesIn,
     PostIn,
@@ -93,11 +94,32 @@ async def list_messages(
 @router.post("/simulate", status_code=202, tags=["streams"])
 async def simulate(body: SimulateIn, rt: RT):
     """Generate synthetic traffic across many channels (demo and smoke testing)."""
-    if not rt.settings.enable_simulator:
-        raise ServiceError("Simulator is disabled on this deployment")
+    _require_demo_controls(rt)
     total = min(body.messages, rt.settings.simulator_max_messages)
-    rt.spawn(rt.simulate(total, body.channels, body.rate))
+    rt.start_demo(rt.simulate(total, body.channels, body.rate))
     return {"started": True, "messages": total, "channels": body.channels, "rate": body.rate}
+
+
+@router.post("/feeds/bluesky", status_code=202, tags=["streams"])
+async def bluesky_feed(body: FeedIn, rt: RT):
+    """Pull real, recent public Bluesky posts (English) through the pipeline. Authors are anonymised."""
+    _require_demo_controls(rt)
+    total = min(body.messages, rt.settings.simulator_max_messages)
+    rt.start_demo(rt.ingest_bluesky(total))
+    return {"started": True, "messages": total, "source": "bluesky"}
+
+
+@router.post("/demo/reset", tags=["streams"])
+async def reset_demo(rt: RT):
+    """Stop the simulator and live feeds, and wipe the queue, live event log and counters."""
+    _require_demo_controls(rt)
+    await rt.reset_demo()
+    return {"reset": True}
+
+
+def _require_demo_controls(rt: Runtime) -> None:
+    if not rt.settings.enable_simulator:
+        raise ServiceError("Demo controls are disabled on this deployment")
 
 
 @router.get("/stream", name="api.stream", tags=["streams"])

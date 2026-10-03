@@ -3,15 +3,17 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import os
 import random
+import secrets
 import shutil
 import threading
 import time
 import uuid
 
-from . import db, metrics
+from . import db, metrics, sources
 from .batching import MicroBatcher
 from .broker import Broker, make_broker
 from .config import Settings
@@ -74,6 +76,9 @@ class Runtime:
         self._stop = asyncio.Event()
         self._workers: list[asyncio.Task] = []
         self._background: set[asyncio.Task] = set()
+        self._demo: set[asyncio.Task] = set()  # simulator / live-feed runs that Reset can cancel
+        self.bluesky_source = sources.bluesky_posts  # swappable in tests
+        self._author_salt = secrets.token_hex(8)  # anonymises real authors; new per process
         os.makedirs(settings.upload_dir, exist_ok=True)
 
     # --- lifecycle ---
@@ -106,9 +111,9 @@ class Runtime:
             _, pending = await asyncio.wait(self._workers, timeout=10)
             for task in pending:
                 task.cancel()
-        for task in self._background:
+        for task in (*self._background, *self._demo):
             task.cancel()
-        await asyncio.gather(*self._background, return_exceptions=True)
+        await asyncio.gather(*self._background, *self._demo, return_exceptions=True)
         await self.hub.stop()
         await self.batcher.stop()
         await self.broker.close()
@@ -118,6 +123,13 @@ class Runtime:
         task = asyncio.create_task(coro)
         self._background.add(task)
         task.add_done_callback(self._background.discard)
+        return task
+
+    def start_demo(self, coro) -> asyncio.Task:
+        """Run a simulator or live-feed job that the demo Reset button can cancel."""
+        task = asyncio.create_task(coro)
+        self._demo.add(task)
+        task.add_done_callback(self._demo.discard)
         return task
 
     async def _poll_queue_metrics(self) -> None:
@@ -239,6 +251,39 @@ class Runtime:
             ])
             sent += n
             await asyncio.sleep(tick)
+
+    async def ingest_bluesky(self, total: int) -> int:
+        """Feed ``total`` real, recent public Bluesky posts through the pipeline.
+        Authors are replaced by a salted hash so no real identity is stored or shown."""
+        batch: list[MessageIn] = []
+        sent = 0
+        try:
+            async for author_id, text in self.bluesky_source(total):
+                tag = hashlib.sha256(f"{self._author_salt}:{author_id}".encode()).hexdigest()[:6]
+                batch.append(MessageIn(channel="bluesky", author=f"bsky-{tag}", text=text))
+                if len(batch) >= 100:
+                    await self.enqueue(batch)
+                    sent += len(batch)
+                    batch = []
+        except Exception:  # noqa: BLE001 - feed outage: keep what was collected
+            log.exception("bluesky feed stopped after %d posts", sent + len(batch))
+        if batch:
+            await self.enqueue(batch)
+            sent += len(batch)
+        log.info("bluesky feed: %d posts enqueued", sent)
+        return sent
+
+    async def reset_demo(self) -> None:
+        """Stop running demo jobs and wipe the queue, live event log and counters."""
+        for task in self._demo:
+            task.cancel()
+        if self._demo:
+            # Don't wait on slow shutdowns (e.g. a WebSocket close handshake): once cancelled,
+            # a job can't enqueue anything more, and in-flight batches are discarded below.
+            await asyncio.wait(self._demo, timeout=0.5)
+        await self.broker.reset()
+        self.hub.flush()  # this node's viewers; other nodes stop receiving once the log is empty
+        log.info("demo reset: queue, events and counters cleared")
 
     # --- stats ---
 

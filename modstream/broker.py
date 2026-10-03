@@ -32,6 +32,7 @@ MESSAGES = "modstream:messages"
 EVENTS = "modstream:events"
 DLQ = "modstream:dlq"
 STATS = "modstream:stats"
+GENERATION = "modstream:generation"
 GROUP = "moderators"
 
 
@@ -90,6 +91,15 @@ class Broker(ABC):
     @abstractmethod
     async def counters(self) -> dict[str, float]: ...
 
+    # --- admin ---
+    @abstractmethod
+    async def reset(self) -> None:
+        """Wipe the work queue, event log, dead-letter queue and counters (demo reset), and
+        bump the generation so batches already in flight are discarded instead of published."""
+
+    @abstractmethod
+    async def generation(self) -> int: ...
+
 
 # --- In-memory ----------------------------------------------------------------
 
@@ -112,6 +122,7 @@ class MemoryBroker(Broker):
     _dlq: list = field(default_factory=list)
     _events: deque = field(default_factory=deque)
     _counters: dict = field(default_factory=dict)
+    _generation: int = 0
     _new_work: asyncio.Event = field(default_factory=asyncio.Event)
     _new_event: asyncio.Condition = field(default_factory=asyncio.Condition)
 
@@ -205,6 +216,18 @@ class MemoryBroker(Broker):
 
     async def counters(self):
         return dict(self._counters)
+
+    async def reset(self):
+        # Event ids keep counting up, so live subscribers resuming from an old id still work.
+        self._queue.clear()
+        self._pending.clear()
+        self._dlq.clear()
+        self._events.clear()
+        self._counters.clear()
+        self._generation += 1
+
+    async def generation(self):
+        return self._generation
 
 
 # --- Redis Streams --------------------------------------------------------------
@@ -324,6 +347,17 @@ class RedisBroker(Broker):
 
     async def counters(self):
         return {k: float(v) for k, v in (await self.r.hgetall(STATS)).items()}
+
+    async def reset(self):
+        # Empty the event log by trimming rather than deleting it: a deleted stream restarts its
+        # ID sequence, and live subscribers resuming after an old ID would skip the new events.
+        await self.r.incr(GENERATION)  # first, so workers mid-batch discard their results
+        await self.r.xtrim(EVENTS, maxlen=0, approximate=False)
+        await self.r.delete(MESSAGES, DLQ, STATS)
+        await self.start()  # recreate the empty work queue and the consumer group workers read from
+
+    async def generation(self):
+        return int(await self.r.get(GENERATION) or 0)
 
 
 def make_broker(redis_url: str | None, **kwargs) -> Broker:

@@ -56,6 +56,7 @@ class Worker:
 
     async def process(self, entries: list[tuple[str, dict]]) -> None:
         broker = self.rt.broker
+        generation = await broker.generation()
         valid, invalid = [], []
         for entry_id, payload in entries:
             try:
@@ -70,6 +71,10 @@ class Worker:
             return
 
         analyses = await self.rt.batcher.run_direct([m.text for _, _, m in valid])
+        if await broker.generation() != generation:
+            # A demo reset wiped the queue while this batch was being scored: drop it.
+            await broker.ack([entry_id for entry_id, _, _ in valid])
+            return
         now = datetime.now(UTC)
         rows = []
         for (entry_id, payload, msg), analysis in zip(valid, analyses, strict=True):

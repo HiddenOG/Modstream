@@ -95,3 +95,22 @@ async def test_counters(broker):
     await broker.incr({"scans": 2})
     counters = await broker.counters()
     assert counters["scans"] == 3 and counters["latency"] == 2.5
+
+
+async def test_reset_wipes_queue_events_and_counters(broker):
+    await broker.enqueue([{"n": 1}, {"n": 2}])
+    await broker.consume("w1", count=1, block_ms=100)  # one pending, one waiting
+    before = await broker.publish([{"i": 1}])
+    await broker.incr({"scans": 5})
+
+    await broker.reset()
+
+    assert await broker.queue_stats() == {"lag": 0, "pending": 0, "dead_lettered": 0}
+    assert await broker.recent_events(10) == []
+    assert await broker.counters() == {}
+    # Still fully usable afterwards, and new event ids keep increasing for live subscribers.
+    await broker.enqueue([{"n": 3}])
+    assert [p["n"] for _, p in await broker.consume("w1", count=10, block_ms=100)] == [3]
+    after = await broker.publish([{"i": 2}])
+    assert [e for _, e in await broker.events_after(before[0], 10)] == [{"i": 2}]
+    assert after[0] != before[0]

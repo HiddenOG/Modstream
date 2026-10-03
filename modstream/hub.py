@@ -117,6 +117,13 @@ class Hub:
         metrics.SUBSCRIBERS.labels(transport).inc()
         return sub
 
+    def flush(self) -> None:
+        """Drop events buffered for local subscribers (after a demo reset)."""
+        for sub in self._subs:
+            while not sub.queue.empty():
+                sub.queue.get_nowait()
+            sub.dropped = 0
+
     def _remove(self, sub: Subscription) -> None:
         if sub in self._subs:
             self._subs.discard(sub)
