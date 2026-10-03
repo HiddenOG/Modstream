@@ -86,14 +86,14 @@ async def test_batch_in_flight_during_reset_is_discarded(runtime, scorer):
     entries = await runtime.broker.consume("w", 10, 100)
     start = await runtime.broker.last_event_id()
 
-    original = scorer.score
+    # A reset lands while the model is running: the generation differs between the worker's
+    # check before scoring and its check after. Works for both the memory and Redis brokers.
+    seen = iter(range(1, 100))
 
-    def score_then_reset(texts):
-        out = original(texts)
-        runtime.broker._generation += 1  # a reset lands while the model is running
-        return out
+    async def changing_generation():
+        return next(seen)
 
-    scorer.score = score_then_reset
+    runtime.broker.generation = changing_generation
     await Worker(runtime, "w").process(entries)
     assert await messages(runtime) == []
     assert await runtime.broker.events_after(start, 10) == []
