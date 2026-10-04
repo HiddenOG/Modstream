@@ -7,14 +7,14 @@
     <div>
       <span class="eyebrow">Moderator console</span>
       <h1 style="margin-top: 8px">Live monitor</h1>
-      <p>Every post, comment and stream message is scored by the worker pool and pushed here over Server-Sent Events. Filters run server-side.</p>
+      <p>Every post, comment and stream message is scored by the worker pool and pushed here over Server-Sent Events. Scroll down for the full history; filters run server-side.</p>
     </div>
     <div class="row" style="--gap: 8px">
       <button class="btn btn-sm btn-primary" type="button" data-bluesky
               title="Real, recent public Bluesky posts (English). Author names are anonymised.">{{ icon("activity", "icon-sm") }}5,000 real Bluesky posts</button>
       <button class="btn btn-sm" type="button" data-simulate>{{ icon("zap", "icon-sm") }}Simulate 5,000</button>
       <button class="btn btn-sm btn-ghost" type="button" data-reset
-              title="Stop running feeds and clear the queue, live events and counters">{{ icon("repeat", "icon-sm") }}Reset</button>
+              title="Stop running feeds and clear the queue, live events, counters and stored stream messages">{{ icon("repeat", "icon-sm") }}Reset</button>
       <span class="status-pill" data-status><span class="dot"></span><span>Connecting…</span></span>
     </div>
   </header>
@@ -36,16 +36,21 @@
         <button class="chip" type="button" data-filter="review" aria-pressed="false">Needs review</button>
       </div>
       <div class="row" style="--gap: 10px">
-        <span class="muted small" data-notice></span>
+        <span class="muted small" data-notice aria-live="polite"></span>
         <button class="btn btn-sm" type="button" data-pause>{{ icon("pause", "icon-sm") }}<span>Pause</span></button>
       </div>
     </div>
-    <div class="events" data-events aria-live="off">
-      <div class="empty" data-empty>
-        {{ icon("activity") }}
-        <div><strong style="color: var(--text)">Waiting for activity</strong><br>
-          <span class="small">Pull real Bluesky posts or simulate traffic above, or post in the <a href="{{ url_for('pages.feed') }}" target="_blank">feed</a>.</span></div>
+    <div class="events-scroll" data-scroll>
+      <button class="btn btn-sm btn-primary new-pill" type="button" data-new hidden>↑ <span>0</span> new</button>
+      <div class="events" data-events aria-live="off">
+        <div class="empty" data-empty>
+          {{ icon("activity") }}
+          <div><strong style="color: var(--text)">Waiting for activity</strong><br>
+            <span class="small">Pull real Bluesky posts or simulate traffic above, or post in the <a href="{{ url_for('pages.feed') }}" target="_blank">feed</a>.</span></div>
+        </div>
       </div>
+      <div class="list-foot" data-foot hidden></div>
+      <div data-sentinel style="height: 1px"></div>
     </div>
   </div>
 </div>
@@ -55,27 +60,44 @@
 <script type="module">
   import { api, h, icon, badge, avatar, timeAgo, pct } from "{{ url_for('static', filename='js/core.js') }}";
 
+  // How it works: the list is a window onto the database. The newest rows arrive live over SSE;
+  // scrolling down pages older stream messages from /api/v1/messages, so nothing is lost even
+  // though only ~KEEP rows are kept in the page at once. While you are reading further down (or
+  // paused), live rows wait behind a "new" button instead of shifting the list under you.
+  const scroller = document.querySelector("[data-scroll]");
   const list = document.querySelector("[data-events]");
   const empty = document.querySelector("[data-empty]");
+  const foot = document.querySelector("[data-foot]");
+  const newBtn = document.querySelector("[data-new]");
   const status = document.querySelector("[data-status]");
   const pauseBtn = document.querySelector("[data-pause]");
   const notice = document.querySelector("[data-notice]");
-  const MAX_ROWS = 150;
+  const KEEP = 400;   // rows kept in the page while following live
+  const PAGE = 100;   // rows per history page
+
   let verdictFilter = "";
   let paused = false;
-  let pending = [];   // events waiting for the next animation frame
   let source;
+  let seen = new Set();     // "message:123" keys already in the page
+  let toRender = [];        // live rows waiting for the next animation frame
+  let waiting = [];         // live rows held back while reading or paused
+  let oldestId = null;      // smallest stream-message id in the page: where history paging resumes
+  let exhausted = false;    // no older messages left in the database
+  let loading = false;
+
+  const LABEL = { post: () => "posted", comment: (i) => `commented on #${i.post_id}`, message: (i) => `in #${i.channel}` };
+  const ICON = { post: "feed", comment: "message", message: "chat" };
+  const keyOf = (type, item) => `${type}:${item.id}`;
+  const atTop = () => scroller.scrollTop < 40;
 
   function setStatus(state, text) {
     status.querySelector(".dot").className = `dot ${state}`;
     status.querySelector("span:last-child").textContent = text;
   }
 
-  const LABEL = { post: () => "posted", comment: (i) => `commented on #${i.post_id}`, message: (i) => `in #${i.channel}` };
-  const ICON = { post: "feed", comment: "message", message: "chat" };
-
-  function row(type, item) {
-    return h("div", { class: `event ${item.verdict} is-new` },
+  function row(type, item, fresh) {
+    return h("div", { class: `event ${item.verdict}${fresh ? " is-new" : ""}`, "data-key": keyOf(type, item),
+                      "data-type": type, "data-id": item.id },
       h("span", { class: "event-kind", title: type }, icon(ICON[type] ?? "message")),
       h("div", { style: "min-width:0" },
         h("div", { class: "row", style: "--gap:8px" },
@@ -92,18 +114,118 @@
     );
   }
 
-  // Batch DOM writes to one per frame: thousands of events/s would otherwise freeze the tab.
-  function flush() {
-    if (!pending.length) return;
-    const batch = pending.slice(-MAX_ROWS);
-    pending = [];
-    empty.remove();
-    const frag = document.createDocumentFragment();
-    for (let i = batch.length - 1; i >= 0; i--) frag.append(row(...batch[i]));
-    list.prepend(frag);
-    while (list.children.length > MAX_ROWS) list.lastElementChild.remove();
+  function recomputeOldest() {
+    const ids = [...list.querySelectorAll('.event[data-type="message"]')].map((el) => Number(el.dataset.id));
+    oldestId = ids.length ? Math.min(...ids) : null;
   }
-  (function loop() { if (!paused) flush(); requestAnimationFrame(loop); })();
+
+  function showEmptyIfNeeded() {
+    if (!list.querySelector(".event")) list.append(empty);
+    else empty.remove();
+  }
+
+  function clearList() {
+    list.querySelectorAll(".event").forEach((el) => el.remove());
+    seen = new Set(); toRender = []; waiting = []; oldestId = null; exhausted = false;
+    foot.hidden = true;
+    updateNewButton();
+    showEmptyIfNeeded();
+  }
+
+  // --- live rows (top) ---------------------------------------------------------------------
+
+  function prepend(rows) {
+    const frag = document.createDocumentFragment();
+    for (let i = rows.length - 1; i >= 0; i--) {   // newest first
+      const [type, item] = rows[i];
+      const key = keyOf(type, item);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      frag.append(row(type, item, true));
+    }
+    list.prepend(frag);
+    const rowsNow = list.querySelectorAll(".event");
+    for (let i = rowsNow.length - 1; i >= KEEP; i--) {   // older rows stay reachable by scrolling
+      seen.delete(rowsNow[i].dataset.key);
+      rowsNow[i].remove();
+    }
+    if (rowsNow.length > KEEP) { exhausted = false; foot.hidden = true; }
+    recomputeOldest();
+    showEmptyIfNeeded();
+  }
+
+  // One DOM write per frame: thousands of events per second would otherwise freeze the tab.
+  (function frame() {
+    if (toRender.length) { prepend(toRender); toRender = []; }
+    requestAnimationFrame(frame);
+  })();
+
+  function onLive(type, item) {
+    if (paused || !atTop()) { waiting.push([type, item]); updateNewButton(); }
+    else toRender.push([type, item]);
+  }
+
+  function updateNewButton() {
+    newBtn.hidden = waiting.length === 0;
+    newBtn.querySelector("span").textContent = waiting.length.toLocaleString();
+  }
+
+  function releaseWaiting() {
+    if (!waiting.length) return;
+    if (waiting.length > KEEP) {
+      // Too many to show at once: start the window at the newest and let scrolling page back.
+      const newest = waiting.slice(-KEEP);
+      clearList();
+      toRender = newest;
+    } else {
+      toRender.push(...waiting);
+      waiting = [];
+    }
+    updateNewButton();
+  }
+
+  newBtn.addEventListener("click", () => {
+    scroller.scrollTo({ top: 0 });
+    if (!paused) releaseWaiting();
+  });
+  scroller.addEventListener("scroll", () => { if (atTop() && !paused) releaseWaiting(); });
+
+  // --- history (bottom) ---------------------------------------------------------------------
+
+  async function loadOlder() {
+    if (loading || exhausted) return;
+    loading = true;
+    try {
+      const params = new URLSearchParams({ limit: PAGE });
+      if (verdictFilter) params.set("verdict", verdictFilter);
+      if (oldestId !== null) params.set("before_id", oldestId);
+      const { messages } = await api(`/messages?${params}`);
+      const frag = document.createDocumentFragment();
+      for (const item of messages) {
+        const key = keyOf("message", item);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        frag.append(row("message", item, false));
+      }
+      list.append(frag);
+      recomputeOldest();
+      if (messages.length < PAGE) {
+        exhausted = true;
+        foot.hidden = !list.querySelector(".event");
+        foot.textContent = "That's everything. Older messages are cleared by Reset.";
+      }
+      showEmptyIfNeeded();
+    } catch (err) {
+      notice.textContent = `Couldn't load history: ${err.message}`;
+    } finally {
+      loading = false;
+    }
+  }
+
+  new IntersectionObserver((entries) => { if (entries[0].isIntersecting) loadOlder(); },
+                           { root: scroller, rootMargin: "300px" }).observe(document.querySelector("[data-sentinel]"));
+
+  // --- live connection ------------------------------------------------------------------------
 
   function connect() {
     source?.close();
@@ -112,40 +234,57 @@
     source.addEventListener("open", () => setStatus("live", "Live"));
     source.addEventListener("error", () => setStatus("down", "Reconnecting…"));
     source.addEventListener("lagged", (e) => {
-      notice.textContent = `Skipped ${JSON.parse(e.data).dropped.toLocaleString()} events to keep up`;
+      notice.textContent = `${JSON.parse(e.data).dropped.toLocaleString()} live updates skipped; they're in the history below`;
     });
     for (const type of ["post", "comment", "message"]) {
-      source.addEventListener(type, (e) => { if (!paused) pending.push([type, JSON.parse(e.data)]); });
+      source.addEventListener(type, (e) => onLive(type, JSON.parse(e.data)));
     }
   }
 
-  // Throughput from counter deltas: accurate no matter how many events the browser receives.
+  function restart() {
+    clearList();
+    scroller.scrollTo({ top: 0 });
+    connect();
+    loadOlder();
+  }
+
+  // --- stats and feed progress ---------------------------------------------------------------
+
+  const FEED_TEXT = {
+    connecting: (f) => `Connecting to ${f.source === "bluesky" ? "Bluesky" : "the simulator"}…`,
+    running: (f) => `${f.source === "bluesky" ? "Pulling Bluesky posts" : "Simulating"}: ${f.sent.toLocaleString()} / ${f.target.toLocaleString()}`,
+    done: (f) => `Done: ${f.sent.toLocaleString()} ${f.source === "bluesky" ? "Bluesky posts" : "simulated messages"} sent`,
+    failed: (f) => `Bluesky feed stopped after ${f.sent.toLocaleString()} posts`,
+  };
+
   let last = null;
   async function pollStats() {
     const stats = await api("/stats").catch(() => null);
     if (stats) {
       const now = performance.now();
       if (last) document.querySelector("[data-rate]").textContent =
-        Math.round((stats.scans - last.scans) / ((now - last.t) / 1000)).toLocaleString();
+        Math.max(0, Math.round((stats.scans - last.scans) / ((now - last.t) / 1000))).toLocaleString();
       last = { scans: stats.scans, t: now };
       document.querySelectorAll("[data-stat]").forEach((el) => { el.textContent = stats[el.dataset.stat].toLocaleString(); });
       document.querySelector("[data-backlog]").textContent = (stats.queue.lag + stats.queue.pending).toLocaleString();
+      if (stats.feed) notice.textContent = FEED_TEXT[stats.feed.state]?.(stats.feed) ?? "";
     }
     setTimeout(pollStats, 1000);
   }
 
+  // --- controls ------------------------------------------------------------------------------------
+
   document.querySelectorAll("[data-filter]").forEach((chip) => chip.addEventListener("click", () => {
     verdictFilter = chip.dataset.filter;
     document.querySelectorAll("[data-filter]").forEach((c) => c.setAttribute("aria-pressed", String(c === chip)));
-    list.querySelectorAll(".event").forEach((el) => el.remove());
-    notice.textContent = "";
-    connect();
+    restart();
   }));
 
   pauseBtn.addEventListener("click", () => {
     paused = !paused;
     pauseBtn.querySelector("use").setAttribute("href", paused ? "#i-play" : "#i-pause");
     pauseBtn.querySelector("span").textContent = paused ? "Resume" : "Pause";
+    if (!paused && atTop()) releaseWaiting();
   });
 
   function onClick(selector, path, body, done) {
@@ -164,19 +303,16 @@
   }
 
   onClick("[data-bluesky]", "/feeds/bluesky", { messages: 5000 },
-    () => { notice.textContent = "Pulling real Bluesky posts…"; });
+    () => { notice.textContent = "Connecting to Bluesky…"; });
   onClick("[data-simulate]", "/simulate", { messages: 5000, channels: 200, rate: 1000 });
   onClick("[data-reset]", "/demo/reset", {}, () => {
-    pending = [];
-    list.querySelectorAll(".event").forEach((el) => el.remove());
-    list.append(empty);
     last = null;
     document.querySelector("[data-rate]").textContent = "0";
-    notice.textContent = "Reset: queue, live events and counters cleared";
-    connect();  // a fresh connection drops anything still in transit on the old one
+    notice.textContent = "Reset: queue, live events, counters and stream history cleared";
+    restart();  // a fresh connection also drops anything still in transit on the old one
   });
 
-  connect();
+  restart();
   pollStats();
 </script>
 {% endblock %}

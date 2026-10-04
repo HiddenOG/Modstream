@@ -241,3 +241,28 @@ def test_demo_controls_can_be_disabled(settings, detector):
     with TestClient(app) as client:
         for path in ("/api/v1/demo/reset", "/api/v1/feeds/bluesky", "/api/v1/simulate"):
             assert client.post(path, json={}).status_code == 400
+
+
+def test_messages_history_pages_back_with_before_id(client):
+    client.post("/api/v1/messages", json={"messages": [{"text": f"message {i}"} for i in range(25)]})
+    wait_for(lambda: len(client.get("/api/v1/messages", params={"limit": 500}).json()["messages"]) == 25)
+    first = client.get("/api/v1/messages", params={"limit": 10}).json()["messages"]
+    second = client.get("/api/v1/messages", params={"limit": 10, "before_id": first[-1]["id"]}).json()["messages"]
+    rest = client.get("/api/v1/messages", params={"limit": 10, "before_id": second[-1]["id"]}).json()["messages"]
+    ids = [m["id"] for m in first + second + rest]
+    assert len(ids) == 25 and len(set(ids)) == 25 and ids == sorted(ids, reverse=True)
+
+
+def test_reset_clears_stored_stream_messages_and_reports_feed_progress(client):
+    async def fake_source(limit):
+        for i in range(limit):
+            yield "did:x", f"post {i}"
+
+    client.app.state.rt.bluesky_source = fake_source
+    client.post("/api/v1/feeds/bluesky", json={"messages": 120})
+    feed = wait_for(lambda: (f := client.get("/api/v1/stats").json()["feed"]) and f["state"] == "done" and f)
+    assert feed["sent"] == 120 and feed["target"] == 120 and feed["source"] == "bluesky"
+    wait_for(lambda: len(client.get("/api/v1/messages", params={"limit": 500}).json()["messages"]) == 120)
+    client.post("/api/v1/demo/reset")
+    assert client.get("/api/v1/messages").json()["messages"] == []
+    assert client.get("/api/v1/stats").json()["feed"] is None

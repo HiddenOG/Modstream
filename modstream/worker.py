@@ -55,6 +55,12 @@ class Worker:
         log.info("worker %s stopped", self.name)
 
     async def process(self, entries: list[tuple[str, dict]]) -> None:
+        # A demo reset on this node waits for the batch in flight, so a half-finished batch can't
+        # write counters after the wipe. Across nodes, the generation check below covers it.
+        async with self.rt.batch_lock:
+            await self._process(entries)
+
+    async def _process(self, entries: list[tuple[str, dict]]) -> None:
         broker = self.rt.broker
         generation = await broker.generation()
         valid, invalid = [], []

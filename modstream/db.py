@@ -16,6 +16,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    delete,
     event,
     func,
     select,
@@ -223,10 +224,20 @@ async def insert_messages(s: AsyncSession, rows: list[dict]) -> dict[str, int]:
     return {entry_id: msg_id for entry_id, msg_id in ids}
 
 
-async def list_messages(s: AsyncSession, channel: str | None, verdict: str | None, limit: int) -> list[dict]:
+async def list_messages(
+    s: AsyncSession, channel: str | None, verdict: str | None, limit: int, before_id: int | None = None,
+) -> list[dict]:
+    """Newest first. Pass the smallest id you have as ``before_id`` to page further back."""
     q = select(Message).order_by(Message.id.desc()).limit(limit)
     if channel:
         q = q.where(Message.channel == channel)
     if verdict:
         q = q.where(Message.verdict == verdict)
+    if before_id is not None:
+        q = q.where(Message.id < before_id)
     return [m.to_dict() for m in (await s.scalars(q)).all()]
+
+
+async def delete_messages(s: AsyncSession) -> None:
+    await s.execute(delete(Message))
+    await s.commit()

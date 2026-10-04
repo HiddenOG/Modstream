@@ -77,8 +77,10 @@ class Runtime:
         self._workers: list[asyncio.Task] = []
         self._background: set[asyncio.Task] = set()
         self._demo: set[asyncio.Task] = set()  # simulator / live-feed runs that Reset can cancel
+        self.batch_lock = asyncio.Lock()  # demo reset waits for this node's in-flight worker batch
         self.bluesky_source = sources.bluesky_posts  # swappable in tests
         self._author_salt = secrets.token_hex(8)  # anonymises real authors; new per process
+        self.feed: dict | None = None  # progress of the current simulator / live feed
         os.makedirs(settings.upload_dir, exist_ok=True)
 
     # --- lifecycle ---
@@ -233,15 +235,22 @@ class Runtime:
         now = time.time()
         return await self.broker.enqueue([{**m.model_dump(), "enqueued_at": now} for m in messages])
 
-    async def list_messages(self, channel: str | None, verdict: str | None, limit: int) -> list[dict]:
+    async def list_messages(
+        self, channel: str | None, verdict: str | None, limit: int, before_id: int | None = None,
+    ) -> list[dict]:
         async with self.sessions() as s:
-            return await db.list_messages(s, channel, verdict, limit)
+            return await db.list_messages(s, channel, verdict, limit, before_id)
+
+    def _progress(self, source: str, state: str, sent: int, target: int) -> None:
+        """Progress of the current demo feed, shown on the monitor (this API node only)."""
+        self.feed = {"source": source, "state": state, "sent": sent, "target": target}
 
     async def simulate(self, total: int, channels: int, rate: int) -> None:
         """Generate synthetic chat traffic across many channels (demo + smoke testing)."""
         tick = 0.05
         per_tick = max(1, int(rate * tick))
         sent = 0
+        self._progress("simulator", "running", 0, total)
         while sent < total:
             n = min(per_tick, total - sent)
             await self.enqueue([
@@ -250,26 +259,33 @@ class Runtime:
                 for _ in range(n)
             ])
             sent += n
+            self._progress("simulator", "running", sent, total)
             await asyncio.sleep(tick)
+        self._progress("simulator", "done", sent, total)
 
     async def ingest_bluesky(self, total: int) -> int:
         """Feed ``total`` real, recent public Bluesky posts through the pipeline.
         Authors are replaced by a salted hash so no real identity is stored or shown."""
         batch: list[MessageIn] = []
         sent = 0
+        self._progress("bluesky", "connecting", 0, total)
         try:
             async for author_id, text in self.bluesky_source(total):
                 tag = hashlib.sha256(f"{self._author_salt}:{author_id}".encode()).hexdigest()[:6]
                 batch.append(MessageIn(channel="bluesky", author=f"bsky-{tag}", text=text))
-                if len(batch) >= 100:
+                if len(batch) >= 50:
                     await self.enqueue(batch)
                     sent += len(batch)
                     batch = []
+                    self._progress("bluesky", "running", sent, total)
+            state = "done"
         except Exception:  # noqa: BLE001 - feed outage: keep what was collected
             log.exception("bluesky feed stopped after %d posts", sent + len(batch))
+            state = "failed"
         if batch:
             await self.enqueue(batch)
             sent += len(batch)
+        self._progress("bluesky", state, sent, total)
         log.info("bluesky feed: %d posts enqueued", sent)
         return sent
 
@@ -281,9 +297,13 @@ class Runtime:
             # Don't wait on slow shutdowns (e.g. a WebSocket close handshake): once cancelled,
             # a job can't enqueue anything more, and in-flight batches are discarded below.
             await asyncio.wait(self._demo, timeout=0.5)
-        await self.broker.reset()
-        self.hub.flush()  # this node's viewers; other nodes stop receiving once the log is empty
-        log.info("demo reset: queue, events and counters cleared")
+        async with self.batch_lock:
+            await self.broker.reset()
+            self.hub.flush()  # this node's viewers; other nodes stop receiving once the log is empty
+            async with self.sessions() as s:
+                await db.delete_messages(s)  # stream messages only; feed posts and comments are kept
+        self.feed = None
+        log.info("demo reset: queue, events, counters and stream messages cleared")
 
     # --- stats ---
 
@@ -306,6 +326,7 @@ class Runtime:
             "flagged_messages": int(c.get("flagged:stream", 0)),
             "queue": await self.broker.queue_stats(),
             "subscribers": self.hub.subscriber_count,
+            "feed": self.feed,
             **content,
         }
 

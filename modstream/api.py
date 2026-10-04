@@ -87,8 +87,10 @@ async def list_messages(
     channel: str | None = None,
     verdict: str | None = None,
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
+    before_id: Annotated[int | None, Query(description="Page back: return messages older than this id")] = None,
 ):
-    return {"messages": await rt.list_messages(channel, verdict, limit)}
+    """Moderated stream messages, newest first."""
+    return {"messages": await rt.list_messages(channel, verdict, limit, before_id)}
 
 
 @router.post("/simulate", status_code=202, tags=["streams"])

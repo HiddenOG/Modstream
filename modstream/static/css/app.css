@@ -416,6 +416,12 @@ mark.mild { background: transparent; box-shadow: inset 0 -1px 0 var(--muted); }
 
 .status-pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); font-size: 0.82rem; font-weight: 550; }
 .events { display: flex; flex-direction: column; }
+.events-scroll { position: relative; max-height: min(70vh, 900px); overflow-y: auto; overscroll-behavior: contain; }
+.new-pill {
+  position: sticky; top: 10px; z-index: 3; align-self: center; margin: 10px auto -46px; display: inline-flex;
+  box-shadow: var(--shadow-lg);
+}
+.list-foot { padding: 16px; text-align: center; font-size: 0.85rem; color: var(--muted); border-top: 1px solid var(--border); }
 .event { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: start; padding: 14px 20px; border-top: 1px solid var(--border); }
 .event:first-child { border-top: 0; }
 .event.is-new { animation: flashIn 1.6s ease; }
