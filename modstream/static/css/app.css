@@ -287,7 +287,8 @@ kbd {
     radial-gradient(35% 45% at 85% 20%, color-mix(in srgb, var(--flagged) 9%, transparent), transparent 70%);
   pointer-events: none;
 }
-.hero-grid { display: grid; gap: 40px; align-items: center; }
+/* Top-aligned: centring made the headline jump down when the try-it result grew the right column. */
+.hero-grid { display: grid; gap: 40px; align-items: start; }
 @media (min-width: 960px) { .hero-grid { grid-template-columns: 1.05fr 1fr; gap: 56px; } .hero { padding: 88px 0 64px; } }
 .hero h1 .accent { background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 50%, var(--flagged))); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .hero-lead { margin-top: 18px; font-size: 1.08rem; color: var(--muted); max-width: 540px; }
