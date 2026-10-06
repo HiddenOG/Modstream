@@ -17,3 +17,6 @@ static/uploads/*
 .env
 .env.*
 !.env.example
+
+# Local editor/assistant settings
+.claude/

@@ -154,6 +154,3 @@ Phases 1–5 are done; next are ONNX/int8 inference, an LLM review tier, a multi
 - Sarcasm, quotes and reclaimed language are hard; ambiguous content is routed to review, not auto-removed.
 - Jigsaw-trained toxicity models over-flag mentions of some identity groups.
 - English-first, with a few Nigerian Pidgin insults in the rule layer.
-
-## Credits
-
