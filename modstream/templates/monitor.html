@@ -7,14 +7,14 @@
     <div>
       <span class="eyebrow">Moderator console</span>
       <h1 style="margin-top: 8px">Live monitor</h1>
-      <p>Every post, comment and stream message is scored by the worker pool and pushed here over Server-Sent Events. Scroll down for the full history; filters run server-side.</p>
+      <p>Every post, comment and stream message is scored by the worker pool and pushed here over Server-Sent Events. Scroll down for the full history; filters run server-side. {{ icon("lock", "icon-sm") }} Private to your browser: other visitors never see your activity.</p>
     </div>
     <div class="row" style="--gap: 8px">
       <button class="btn btn-sm btn-primary" type="button" data-bluesky
               title="Real, recent public Bluesky posts (English). Author names are anonymised.">{{ icon("activity", "icon-sm") }}5,000 real Bluesky posts</button>
       <button class="btn btn-sm" type="button" data-simulate>{{ icon("zap", "icon-sm") }}Simulate 5,000</button>
       <button class="btn btn-sm btn-ghost" type="button" data-reset
-              title="Stop running feeds and clear the queue, live events, counters and stored stream messages">{{ icon("repeat", "icon-sm") }}Reset</button>
+              title="Stop your running feed and clear your messages, live events and counters">{{ icon("repeat", "icon-sm") }}Reset</button>
       <span class="status-pill" data-status><span class="dot"></span><span>Connecting…</span></span>
     </div>
   </header>
@@ -308,7 +308,7 @@
   onClick("[data-reset]", "/demo/reset", {}, () => {
     last = null;
     document.querySelector("[data-rate]").textContent = "0";
-    notice.textContent = "Reset: queue, live events, counters and stream history cleared";
+    notice.textContent = "Reset: your messages, live events and counters were cleared";
     restart();  // a fresh connection also drops anything still in transit on the old one
   });
 

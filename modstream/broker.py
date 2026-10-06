@@ -8,8 +8,13 @@ Three responsibilities:
 * **Event log** (``modstream:events``): a capped, ordered log of moderation results.
   Every API node tails it once and fans out to its local subscribers. Clients
   resume after a disconnect by event id.
-* **Counters** (``modstream:stats``): atomic counters for dashboards, replacing
-  aggregate SQL queries.
+* **Counters** (``modstream:stats:<workspace>``): atomic per-workspace counters for
+  dashboards, replacing aggregate SQL queries.
+
+Every visitor gets a private workspace (a sandbox). The queue and the event log are
+shared; each workspace's dashboards and live views only ever show its own rows. A
+workspace's *generation* goes up when its owner resets it, so work queued or in flight
+before the reset is discarded instead of reappearing.
 
 ``RedisBroker`` is the production implementation (Redis Streams).
 ``MemoryBroker`` implements the same contract in-process, for local
@@ -33,6 +38,7 @@ EVENTS = "modstream:events"
 DLQ = "modstream:dlq"
 STATS = "modstream:stats"
 GENERATION = "modstream:generation"
+WORKSPACE_TTL_S = 2 * 24 * 3600  # per-workspace counters expire after two days of inactivity
 GROUP = "moderators"
 
 
@@ -84,21 +90,20 @@ class Broker(ABC):
     @abstractmethod
     async def recent_events(self, count: int) -> list[Entry]: ...
 
-    # --- counters ---
+    # --- per-workspace counters and resets ---
     @abstractmethod
-    async def incr(self, fields: dict[str, float]) -> None: ...
+    async def incr(self, workspace: str, fields: dict[str, float]) -> None: ...
 
     @abstractmethod
-    async def counters(self) -> dict[str, float]: ...
-
-    # --- admin ---
-    @abstractmethod
-    async def reset(self) -> None:
-        """Wipe the work queue, event log, dead-letter queue and counters (demo reset), and
-        bump the generation so batches already in flight are discarded instead of published."""
+    async def counters(self, workspace: str) -> dict[str, float]: ...
 
     @abstractmethod
-    async def generation(self) -> int: ...
+    async def generation(self, workspace: str) -> int: ...
+
+    @abstractmethod
+    async def reset_workspace(self, workspace: str) -> None:
+        """Clear a workspace's counters and bump its generation, so its queued and in-flight
+        messages are discarded and its old events are hidden from live views."""
 
 
 # --- In-memory ----------------------------------------------------------------
@@ -121,8 +126,8 @@ class MemoryBroker(Broker):
     _pending: dict = field(default_factory=dict)
     _dlq: list = field(default_factory=list)
     _events: deque = field(default_factory=deque)
-    _counters: dict = field(default_factory=dict)
-    _generation: int = 0
+    _counters: dict = field(default_factory=dict)  # workspace -> {field: value}
+    _generations: dict = field(default_factory=dict)  # workspace -> int
     _new_work: asyncio.Event = field(default_factory=asyncio.Event)
     _new_event: asyncio.Condition = field(default_factory=asyncio.Condition)
 
@@ -210,24 +215,20 @@ class MemoryBroker(Broker):
     async def recent_events(self, count):
         return list(self._events)[-count:] if count else []
 
-    async def incr(self, fields):
+    async def incr(self, workspace, fields):
+        counters = self._counters.setdefault(workspace, {})
         for key, value in fields.items():
-            self._counters[key] = self._counters.get(key, 0) + value
+            counters[key] = counters.get(key, 0) + value
 
-    async def counters(self):
-        return dict(self._counters)
+    async def counters(self, workspace):
+        return dict(self._counters.get(workspace, {}))
 
-    async def reset(self):
-        # Event ids keep counting up, so live subscribers resuming from an old id still work.
-        self._queue.clear()
-        self._pending.clear()
-        self._dlq.clear()
-        self._events.clear()
-        self._counters.clear()
-        self._generation += 1
+    async def generation(self, workspace):
+        return self._generations.get(workspace, 0)
 
-    async def generation(self):
-        return self._generation
+    async def reset_workspace(self, workspace):
+        self._generations[workspace] = self._generations.get(workspace, 0) + 1
+        self._counters.pop(workspace, None)
 
 
 # --- Redis Streams --------------------------------------------------------------
@@ -339,25 +340,27 @@ class RedisBroker(Broker):
         entries = await self.r.xrevrange(EVENTS, count=count)
         return [(entry_id, _decode(fields)) for entry_id, fields in reversed(entries)]
 
-    async def incr(self, fields):
+    async def incr(self, workspace, fields):
+        key = f"{STATS}:{workspace}"
         async with self.r.pipeline(transaction=False) as pipe:
-            for key, value in fields.items():
-                pipe.hincrbyfloat(STATS, key, value)
+            for name, value in fields.items():
+                pipe.hincrbyfloat(key, name, value)
+            pipe.expire(key, WORKSPACE_TTL_S)
             await pipe.execute()
 
-    async def counters(self):
-        return {k: float(v) for k, v in (await self.r.hgetall(STATS)).items()}
+    async def counters(self, workspace):
+        return {k: float(v) for k, v in (await self.r.hgetall(f"{STATS}:{workspace}")).items()}
 
-    async def reset(self):
-        # Empty the event log by trimming rather than deleting it: a deleted stream restarts its
-        # ID sequence, and live subscribers resuming after an old ID would skip the new events.
-        await self.r.incr(GENERATION)  # first, so workers mid-batch discard their results
-        await self.r.xtrim(EVENTS, maxlen=0, approximate=False)
-        await self.r.delete(MESSAGES, DLQ, STATS)
-        await self.start()  # recreate the empty work queue and the consumer group workers read from
+    async def generation(self, workspace):
+        return int(await self.r.get(f"{GENERATION}:{workspace}") or 0)
 
-    async def generation(self):
-        return int(await self.r.get(GENERATION) or 0)
+    async def reset_workspace(self, workspace):
+        key = f"{GENERATION}:{workspace}"
+        async with self.r.pipeline(transaction=False) as pipe:
+            pipe.incr(key)  # first, so workers mid-batch discard their results
+            pipe.expire(key, WORKSPACE_TTL_S)
+            pipe.delete(f"{STATS}:{workspace}")
+            await pipe.execute()
 
 
 def make_broker(redis_url: str | None, **kwargs) -> Broker:

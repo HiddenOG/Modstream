@@ -70,6 +70,9 @@
             <button class="btn btn-ghost btn-sm" type="submit" aria-label="Share">{{ icon("repeat") }}<span data-count>{{ post.shares }}</span></button>
           </form>
           <span class="btn btn-ghost btn-sm" style="pointer-events: none">{{ icon("message") }}{{ post.comments | length }}</span>
+          <form method="post" action="{{ url_for('pages.delete_post', post_id=post.id) }}" data-delete style="margin-left: auto">
+            <button class="btn btn-ghost btn-sm" type="submit" aria-label="Delete post" title="Delete post">{{ icon("trash") }}</button>
+          </form>
         </div>
 
         <div class="comments">
@@ -113,6 +116,10 @@
           <div><div class="tile-label">Flagged</div><div class="tile-value" style="color: var(--flagged)">{{ stats.flagged_comments }}</div></div>
         </div>
         <a class="btn btn-sm" href="{{ url_for('pages.monitor') }}" style="margin-top: 18px; width: 100%">{{ icon("activity", "icon-sm") }}Open live monitor</a>
+        <form method="post" action="{{ url_for('pages.clear_feed') }}" data-clear style="margin-top: 8px">
+          <button class="btn btn-sm btn-ghost" type="submit" style="width: 100%" {% if not posts %}disabled{% endif %}>{{ icon("trash", "icon-sm") }}Clear my feed</button>
+        </form>
+        <p class="muted small" style="margin-top: 12px">{{ icon("lock", "icon-sm") }} Private to your browser: other visitors can't see your posts. Cleared automatically after 24 hours.</p>
       </div>
       <div class="card card-pad small">
         <h3 style="font-size: 0.95rem">How this feed protects people</h3>
@@ -171,5 +178,22 @@
       btn.classList.remove("is-active");
     }
   }));
+
+  // Delete one post in place; the form still works without JavaScript.
+  document.querySelectorAll("[data-delete]").forEach((form) => form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const post = form.closest(".post");
+    try {
+      await api(`/posts/${post.id.split("-")[1]}`, { method: "DELETE" });
+      post.remove();
+      if (!document.querySelector("article.post")) location.reload();  // show the empty state
+    } catch (err) {
+      alert(err.message);
+    }
+  }));
+
+  document.querySelector("[data-clear]").addEventListener("submit", (e) => {
+    if (!confirm("Delete all of your posts and comments? This can't be undone.")) e.preventDefault();
+  });
 </script>
 {% endblock %}

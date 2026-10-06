@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import icon, avatar %}
+{% from "_macros.html" import icon %}
 {% block title %}Chat guard{% endblock %}
 {% block content %}
 <div class="container">
@@ -11,29 +11,32 @@
 
   <div class="card chat-shell section-sm" style="padding: 0; margin-top: 24px">
     <aside class="chat-list" aria-label="Conversations">
-      <div class="chat-list-head">Messages</div>
-      <div class="convo is-active">{{ avatar("Jordan") }}<div style="min-width: 0"><div class="convo-name">Jordan</div><div class="convo-last" data-last>did you finish the project?</div></div></div>
-      <div class="convo">{{ avatar("Sam") }}<div style="min-width: 0"><div class="convo-name">Sam</div><div class="convo-last">see you at practice 🏀</div></div></div>
-      <div class="convo">{{ avatar("Priya") }}<div style="min-width: 0"><div class="convo-name">Priya</div><div class="convo-last">lol that meme</div></div></div>
+      <div class="chat-list-head row spread">
+        <span>Messages</span>
+        <button class="btn btn-ghost btn-sm" type="button" data-reset title="Clear every conversation and start over">{{ icon("repeat", "icon-sm") }}Reset chats</button>
+      </div>
+      <div data-contacts></div>
+      <p class="muted small" style="padding: 12px 18px">{{ icon("lock", "icon-sm") }} Chats are stored only in this browser.</p>
     </aside>
 
     <section class="chat-main">
       <div class="chat-head">
-        {{ avatar("Jordan") }}
-        <div><div style="font-weight: 600">Jordan</div><div class="muted small">Messages are checked by Modstream</div></div>
+        <span data-head-avatar></span>
+        <div style="min-width: 0"><div style="font-weight: 600" data-head-name></div><div class="muted small">Messages are checked by Modstream</div></div>
         <span class="badge badge-safe" style="margin-left: auto">{{ icon("shield") }}Guard on</span>
       </div>
-
-      <div class="chat-thread" data-thread aria-live="polite">
-        <div class="day">Today</div>
-        <div class="msg in"><div class="msg-bubble">hey! did you finish the group project slides?</div></div>
-        <div class="msg in"><div class="msg-bubble">mine are kinda messy ngl 😅</div></div>
+      <div class="chat-switch" aria-label="Switch conversation">
+        <label class="sr-only" for="contact-select">Conversation</label>
+        <select class="input" id="contact-select" data-select></select>
+        <button class="btn btn-ghost btn-sm" type="button" data-reset>{{ icon("repeat", "icon-sm") }}Reset</button>
       </div>
+
+      <div class="chat-thread" data-thread aria-live="polite"></div>
 
       <div class="chat-composer">
         <form data-chat>
           <label class="sr-only" for="chat-input">Message</label>
-          <textarea class="textarea" id="chat-input" rows="1" maxlength="1000" placeholder="Message Jordan…" required></textarea>
+          <textarea class="textarea" id="chat-input" rows="1" maxlength="1000" required></textarea>
           <button class="btn btn-primary" type="submit" aria-label="Send">{{ icon("send") }}</button>
         </form>
         <div class="guard-hint" data-hint>{{ icon("shield") }}<span>Your message is checked before it's sent</span></div>
@@ -45,18 +48,101 @@
 
 {% block scripts %}
 <script type="module">
-  import { analyze, nudge, h, icon } from "{{ url_for('static', filename='js/core.js') }}";
+  import { analyze, nudge, h, icon, avatar } from "{{ url_for('static', filename='js/core.js') }}";
+
+  // Conversations live only in this browser (localStorage), so every visitor has their own.
+  const CONTACTS = {
+    jordan: { name: "Jordan", opening: ["hey! did you finish the group project slides?", "mine are kinda messy ngl 😅"] },
+    sam: { name: "Sam", opening: ["you coming to practice later?", "see you at practice 🏀"] },
+    priya: { name: "Priya", opening: ["did you see the meme I sent", "lol that meme"] },
+  };
+  const STORE = "modstream.chats.v1";
 
   const form = document.querySelector("[data-chat]");
   const field = form.querySelector("textarea");
   const thread = document.querySelector("[data-thread]");
   const hint = document.querySelector("[data-hint]");
+  const contactsEl = document.querySelector("[data-contacts]");
+  const select = document.querySelector("[data-select]");
   const defaultHint = hint.querySelector("span").textContent;
   let timer;
 
-  function setHint(state, text) {
-    hint.className = `guard-hint ${state}`;
-    hint.querySelector("use").setAttribute("href", state === "safe" ? "#i-check" : state ? "#i-alert" : "#i-shield");
+  function fresh() {
+    const chats = {};
+    for (const [id, c] of Object.entries(CONTACTS)) chats[id] = c.opening.map((text) => ({ dir: "in", text }));
+    return { active: "jordan", chats };
+  }
+
+  function load() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORE));
+      if (saved?.chats && CONTACTS[saved.active]) return { ...fresh(), ...saved, chats: { ...fresh().chats, ...saved.chats } };
+    } catch { /* storage blocked or corrupt: start fresh */ }
+    return fresh();
+  }
+
+  let state = load();
+  const save = () => { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch { /* private mode */ } };
+
+  function lastLine(id) {
+    const msgs = state.chats[id];
+    const last = msgs[msgs.length - 1];
+    return last ? `${last.dir === "out" ? "You: " : ""}${last.text}` : "";
+  }
+
+  function renderContacts() {
+    contactsEl.replaceChildren(...Object.entries(CONTACTS).map(([id, c]) =>
+      h("button", { type: "button", class: `convo${id === state.active ? " is-active" : ""}`, "data-id": id,
+                    "aria-current": id === state.active ? "true" : false },
+        avatar(c.name),
+        h("div", { style: "min-width:0; text-align:left" },
+          h("div", { class: "convo-name" }, c.name),
+          h("div", { class: "convo-last" }, lastLine(id))))));
+    select.replaceChildren(...Object.entries(CONTACTS).map(([id, c]) =>
+      h("option", { value: id, selected: id === state.active }, c.name)));
+  }
+
+  function bubble(m) {
+    const meta = m.dir !== "out" ? null : m.flagged
+      ? h("span", { class: "msg-meta", style: "color: var(--flagged)" }, icon("alert"),
+          `Sent with warning: hidden from ${CONTACTS[state.active].name} until they tap to view`)
+      : h("span", { class: "msg-meta" }, icon("check"), `Checked · ${m.ms} ms`);
+    return h("div", { class: `msg ${m.dir}${m.flagged ? " flagged" : ""}` }, h("div", { class: "msg-bubble" }, m.text), meta);
+  }
+
+  function renderThread() {
+    const c = CONTACTS[state.active];
+    document.querySelector("[data-head-avatar]").replaceChildren(avatar(c.name));
+    document.querySelector("[data-head-name]").textContent = c.name;
+    field.placeholder = `Message ${c.name}…`;
+    thread.replaceChildren(h("div", { class: "day" }, "Today"), ...state.chats[state.active].map(bubble));
+    thread.scrollTop = thread.scrollHeight;
+  }
+
+  function open(id) {
+    if (!CONTACTS[id]) return;
+    state.active = id;
+    save();
+    renderContacts();
+    renderThread();
+    field.value = "";
+    setHint("", defaultHint);
+    field.focus();
+  }
+
+  contactsEl.addEventListener("click", (e) => { const b = e.target.closest("[data-id]"); if (b) open(b.dataset.id); });
+  select.addEventListener("change", () => open(select.value));
+  document.querySelectorAll("[data-reset]").forEach((b) => b.addEventListener("click", () => {
+    if (!confirm("Clear all conversations and start over?")) return;
+    state = fresh();
+    save();
+    renderContacts();
+    renderThread();
+  }));
+
+  function setHint(level, text) {
+    hint.className = `guard-hint ${level}`;
+    hint.querySelector("use").setAttribute("href", level === "safe" ? "#i-check" : level ? "#i-alert" : "#i-shield");
     hint.querySelector("span").textContent = text;
   }
 
@@ -85,15 +171,6 @@
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); }
   });
 
-  function append(text, result, sentAnyway) {
-    const meta = sentAnyway
-      ? h("span", { class: "msg-meta", style: "color: var(--flagged)" }, icon("alert"), "Sent with warning: hidden from Jordan until they tap to view")
-      : h("span", { class: "msg-meta" }, icon("check"), `Checked · ${result.latency_ms} ms`);
-    thread.append(h("div", { class: `msg out${sentAnyway ? " flagged" : ""}` }, h("div", { class: "msg-bubble" }, text), meta));
-    thread.scrollTop = thread.scrollHeight;
-    document.querySelector("[data-last]").textContent = `You: ${text}`;
-  }
-
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const text = field.value.trim();
@@ -103,12 +180,15 @@
     try {
       // Record the send-time check (the live checks above are not recorded).
       const result = await analyze(text, "chat");
-      let sentAnyway = false;
+      let flagged = false;
       if (result.verdict !== "safe") {
         if ((await nudge(result, text)) !== "send") return field.focus();
-        sentAnyway = result.verdict === "flagged";
+        flagged = result.verdict === "flagged";
       }
-      append(text, result, sentAnyway);
+      state.chats[state.active].push({ dir: "out", text, flagged, ms: result.latency_ms });
+      save();
+      renderThread();
+      renderContacts();
       field.value = "";
       autosize();
       setHint("", defaultHint);
@@ -118,5 +198,8 @@
       btn.classList.remove("is-loading");
     }
   });
+
+  renderContacts();
+  renderThread();
 </script>
 {% endblock %}

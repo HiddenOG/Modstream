@@ -53,6 +53,11 @@ Modstream scores chats, posts and comments with a hybrid pipeline (a curated rul
 - **Load shedding.** A full batch queue returns 503 with `Retry-After` instead of letting latency grow without bound.
 - **Explainable, bias-aware detection.** Word-boundary matching with leetspeak normalization that keeps original offsets for highlighting; insults and profanity are flagged when aimed at a person, and swearing that isn't is allowed; the model can only send content to review, never flag it alone, because letting it flag raised false alarms from 5.6% to as much as 32% on the evaluation set; purely religious vocabulary is deliberately excluded ([detector](modstream/detector.py)).
 - **Privacy by default.** Analyzer and chat text is never stored; dashboards use counters, not content.
+- **A private sandbox per visitor.** Many people can use the public demo at once without seeing each other's
+  activity: a session cookie assigns each visitor a workspace, and every row, counter and live event is tagged
+  with it ([workspace.py](modstream/workspace.py)). Resets bump a per-workspace generation so queued and
+  in-flight work from before the reset is dropped. Sandboxes expire after 24 hours, and each visitor can run one
+  simulator or live feed at a time.
 
 ## Quick start
 

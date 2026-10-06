@@ -44,8 +44,17 @@ class HubEvent:
         return f'{{"type":"event","id":{json.dumps(self.id)},"event":{json.dumps(self.event)}}}'
 
 
-def make_filter(channel: str | None = None, verdicts: set[str] | None = None) -> EventFilter:
+def make_filter(
+    channel: str | None = None, verdicts: set[str] | None = None,
+    workspace: str | None = None, generation: int | None = None,
+) -> EventFilter:
+    """Events for one workspace (and its current generation, so pre-reset events stay hidden),
+    optionally narrowed to a channel and verdicts."""
     def accept(event: dict) -> bool:
+        if workspace is not None and event.get("workspace") != workspace:
+            return False
+        if generation is not None and event.get("gen", 0) != generation:
+            return False
         if channel and event.get("channel") != channel:
             return False
         return not verdicts or event.get("data", {}).get("verdict") in verdicts
@@ -54,10 +63,11 @@ def make_filter(channel: str | None = None, verdicts: set[str] | None = None) ->
 
 
 class Subscription:
-    def __init__(self, hub: Hub, accept: EventFilter, maxsize: int, transport: str):
+    def __init__(self, hub: Hub, accept: EventFilter, maxsize: int, transport: str, workspace: str | None = None):
         self._hub = hub
         self.accept = accept
         self.transport = transport
+        self.workspace = workspace
         self.queue: asyncio.Queue[HubEvent] = asyncio.Queue(maxsize=maxsize)
         self.dropped = 0
 
@@ -111,15 +121,19 @@ class Hub:
             self._task.cancel()
             await asyncio.gather(self._task, return_exceptions=True)
 
-    def subscribe(self, accept: EventFilter | None = None, transport: str = "sse") -> Subscription:
-        sub = Subscription(self, accept or (lambda _e: True), self.queue_size, transport)
+    def subscribe(
+        self, accept: EventFilter | None = None, transport: str = "sse", workspace: str | None = None,
+    ) -> Subscription:
+        sub = Subscription(self, accept or (lambda _e: True), self.queue_size, transport, workspace)
         self._subs.add(sub)
         metrics.SUBSCRIBERS.labels(transport).inc()
         return sub
 
-    def flush(self) -> None:
-        """Drop events buffered for local subscribers (after a demo reset)."""
+    def flush(self, workspace: str | None = None) -> None:
+        """Drop events buffered for local subscribers (of one workspace, after its reset)."""
         for sub in self._subs:
+            if workspace is not None and sub.workspace != workspace:
+                continue
             while not sub.queue.empty():
                 sub.queue.get_nowait()
             sub.dropped = 0

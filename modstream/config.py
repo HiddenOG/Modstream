@@ -51,8 +51,11 @@ class Settings(BaseSettings):
     stream_max_seconds: float = 3_600.0  # recycle long-lived connections so load rebalances after scale-out
     stream_backlog: int = 50
 
+    # Demo controls (simulator, live Bluesky feed, per-visitor reset)
     enable_simulator: bool = True
     simulator_max_messages: int = 50_000
+    demo_max_jobs: int = 4  # simulator / feed runs at once across all visitors (one per visitor)
+    demo_retention_hours: float = 24  # sandbox data older than this is deleted; 0 keeps everything
 
     @model_validator(mode="after")
     def _require_shared_secret(self):

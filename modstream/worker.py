@@ -22,6 +22,10 @@ from .schemas import MessageIn
 log = logging.getLogger(__name__)
 
 
+def _ws(payload: dict) -> str:
+    return payload.get("workspace") or db.PUBLIC
+
+
 class Worker:
     def __init__(self, runtime, name: str):
         self.rt = runtime
@@ -60,9 +64,13 @@ class Worker:
         async with self.rt.batch_lock:
             await self._process(entries)
 
+    async def _current(self, valid) -> list:
+        """Keep only messages whose workspace hasn't been reset since they were queued."""
+        generations = {ws: await self.rt.broker.generation(ws) for ws in {_ws(p) for _, p, _ in valid}}
+        return [v for v in valid if v[1].get("gen", 0) == generations[_ws(v[1])]]
+
     async def _process(self, entries: list[tuple[str, dict]]) -> None:
         broker = self.rt.broker
-        generation = await broker.generation()
         valid, invalid = [], []
         for entry_id, payload in entries:
             try:
@@ -73,37 +81,42 @@ class Worker:
             await broker.dead_letter(invalid)
             await broker.ack([i[0] for i in invalid])
             metrics.STREAM_DEAD_LETTERED.inc(len(invalid))
-        if not valid:
-            return
+        all_ids = [entry_id for entry_id, _, _ in valid]
 
-        analyses = await self.rt.batcher.run_direct([m.text for _, _, m in valid])
-        if await broker.generation() != generation:
-            # A demo reset wiped the queue while this batch was being scored: drop it.
-            await broker.ack([entry_id for entry_id, _, _ in valid])
+        valid = await self._current(valid)  # queued before their owner pressed Reset: skip
+        if not valid:
+            await broker.ack(all_ids)
             return
+        analyses = await self.rt.batcher.run_direct([m.text for _, _, m in valid])
+        current = {entry_id for entry_id, _, _ in await self._current(valid)}  # reset during scoring
+        scored = [(v, a) for v, a in zip(valid, analyses, strict=True) if v[0] in current]
+
         now = datetime.now(UTC)
         rows = []
-        for (entry_id, payload, msg), analysis in zip(valid, analyses, strict=True):
+        for (entry_id, payload, msg), analysis in scored:
             enqueued = payload.get("enqueued_at")
             rows.append({
-                "entry_id": entry_id, "channel": msg.channel, "author": msg.author, "body": msg.text,
-                "verdict": analysis.verdict, "risk": analysis.risk, "analysis": analysis.to_dict(),
+                "entry_id": entry_id, "workspace": _ws(payload), "channel": msg.channel, "author": msg.author,
+                "body": msg.text, "verdict": analysis.verdict, "risk": analysis.risk, "analysis": analysis.to_dict(),
                 "enqueued_at": datetime.fromtimestamp(enqueued, UTC) if enqueued else now, "created_at": now,
             })
-        async with self.rt.sessions() as session:
-            ids = await db.insert_messages(session, rows)
+        if rows:
+            async with self.rt.sessions() as session:
+                ids = await db.insert_messages(session, rows)
+            events, by_workspace = [], {}
+            for row, ((_, payload, _), analysis) in zip(rows, scored, strict=True):
+                data = {**row, "id": ids.get(row["entry_id"]),
+                        "enqueued_at": row["enqueued_at"].isoformat(), "created_at": row["created_at"].isoformat()}
+                events.append({"type": "message", "channel": row["channel"], "workspace": row["workspace"],
+                               "gen": payload.get("gen", 0), "data": data})
+                by_workspace.setdefault(row["workspace"], []).append(analysis)
+            await broker.publish(events)
+            for ws, results in by_workspace.items():
+                await self.rt.record(ws, results, "stream")
+        await broker.ack(all_ids)
 
-        events = []
-        for row in rows:
-            data = {**row, "id": ids.get(row["entry_id"]),
-                    "enqueued_at": row["enqueued_at"].isoformat(), "created_at": row["created_at"].isoformat()}
-            events.append({"type": "message", "channel": row["channel"], "data": data})
-        await broker.publish(events)
-        await self.rt.record(list(analyses), "stream")
-        await broker.ack([entry_id for entry_id, _, _ in valid])
-
-        metrics.STREAM_PROCESSED.inc(len(valid))
+        metrics.STREAM_PROCESSED.inc(len(scored))
         wall = time.time()
-        for _, payload, _ in valid:
+        for (_, payload, _), _analysis in scored:
             if payload.get("enqueued_at"):
                 metrics.STREAM_E2E_SECONDS.observe(max(0.0, wall - payload["enqueued_at"]))

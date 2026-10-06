@@ -47,9 +47,13 @@ class Base(DeclarativeBase):
         return out
 
 
+PUBLIC = "public"  # workspace for rows written before workspaces existed
+
+
 class Post(Base):
     __tablename__ = "posts"
     id: Mapped[int] = mapped_column(Id, primary_key=True, autoincrement=True)
+    workspace: Mapped[str] = mapped_column(String(32), default=PUBLIC, server_default=PUBLIC, index=True)
     author: Mapped[str] = mapped_column(String(40))
     body: Mapped[str] = mapped_column(Text)
     image: Mapped[str | None] = mapped_column(String(64))
@@ -65,6 +69,7 @@ class Comment(Base):
     __tablename__ = "comments"
     id: Mapped[int] = mapped_column(Id, primary_key=True, autoincrement=True)
     post_id: Mapped[int] = mapped_column(ForeignKey("posts.id", ondelete="CASCADE"), index=True)
+    workspace: Mapped[str] = mapped_column(String(32), default=PUBLIC, server_default=PUBLIC, index=True)
     author: Mapped[str] = mapped_column(String(40))
     body: Mapped[str] = mapped_column(Text)
     verdict: Mapped[str] = mapped_column(String(10), index=True)
@@ -79,6 +84,7 @@ class Message(Base):
     __tablename__ = "messages"
     id: Mapped[int] = mapped_column(Id, primary_key=True, autoincrement=True)
     entry_id: Mapped[str] = mapped_column(String(64), unique=True)  # broker id: makes redelivery idempotent
+    workspace: Mapped[str] = mapped_column(String(32), default=PUBLIC, server_default=PUBLIC)
     channel: Mapped[str] = mapped_column(String(64))
     author: Mapped[str] = mapped_column(String(40))
     body: Mapped[str] = mapped_column(Text)
@@ -89,6 +95,7 @@ class Message(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     __table_args__ = (
+        Index("ix_messages_workspace_id", "workspace", "id"),
         Index("ix_messages_channel_id", "channel", "id"),
         Index("ix_messages_verdict_id", "verdict", "id"),
     )
@@ -126,6 +133,7 @@ async def create_schema(engine: AsyncEngine, attempts: int = 5) -> None:
         try:
             async with engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
+                await conn.run_sync(_add_missing_columns)
             return
         except DBAPIError as exc:
             if attempt == attempts - 1 or not any(
@@ -135,7 +143,21 @@ async def create_schema(engine: AsyncEngine, attempts: int = 5) -> None:
             await asyncio.sleep(0.2 * (attempt + 1))
 
 
+def _add_missing_columns(conn) -> None:
+    """Upgrade databases created before workspaces existed: add the column (existing rows
+    land in the "public" workspace) and its indexes. A stand-in until real migrations."""
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(conn)
+    for table in ("posts", "comments", "messages"):
+        if "workspace" not in {c["name"] for c in inspector.get_columns(table)}:
+            conn.execute(text(f"ALTER TABLE {table} ADD COLUMN workspace VARCHAR(32) NOT NULL DEFAULT '{PUBLIC}'"))
+    for index in (*Post.__table__.indexes, *Comment.__table__.indexes, *Message.__table__.indexes):
+        index.create(conn, checkfirst=True)
+
+
 # --- Posts & comments ---------------------------------------------------------------
+# Every query takes the caller's workspace: a visitor only ever sees and changes their own rows.
 
 def _with_comments(post: Post, comments: list[Comment]) -> dict:
     out = post.to_dict()
@@ -143,24 +165,28 @@ def _with_comments(post: Post, comments: list[Comment]) -> dict:
     return out
 
 
-async def insert_post(s: AsyncSession, author: str, body: str, image: str | None, analysis) -> dict:
-    post = Post(author=author, body=body, image=image, verdict=analysis.verdict,
+async def insert_post(s: AsyncSession, ws: str, author: str, body: str, image: str | None, analysis) -> dict:
+    post = Post(workspace=ws, author=author, body=body, image=image, verdict=analysis.verdict,
                 risk=analysis.risk, analysis=analysis.to_dict(), likes=0, shares=0)
     s.add(post)
     await s.commit()
     return _with_comments(post, [])
 
 
-async def get_post(s: AsyncSession, post_id: int) -> dict | None:
-    post = await s.get(Post, post_id)
+async def find_post(s: AsyncSession, ws: str, post_id: int) -> Post | None:
+    return (await s.scalars(select(Post).where(Post.id == post_id, Post.workspace == ws))).first()
+
+
+async def get_post(s: AsyncSession, ws: str, post_id: int) -> dict | None:
+    post = await find_post(s, ws, post_id)
     if post is None:
         return None
     comments = (await s.scalars(select(Comment).where(Comment.post_id == post_id).order_by(Comment.id))).all()
     return _with_comments(post, list(comments))
 
 
-async def list_posts(s: AsyncSession, limit: int = 50) -> list[dict]:
-    posts = (await s.scalars(select(Post).order_by(Post.id.desc()).limit(limit))).all()
+async def list_posts(s: AsyncSession, ws: str, limit: int = 50) -> list[dict]:
+    posts = (await s.scalars(select(Post).where(Post.workspace == ws).order_by(Post.id.desc()).limit(limit))).all()
     if not posts:
         return []
     by_post: dict[int, list] = {p.id: [] for p in posts}
@@ -170,34 +196,68 @@ async def list_posts(s: AsyncSession, limit: int = 50) -> list[dict]:
     return [_with_comments(p, by_post[p.id]) for p in posts]
 
 
-async def insert_comment(s: AsyncSession, post_id: int, author: str, body: str, analysis) -> dict:
-    comment = Comment(post_id=post_id, author=author, body=body, verdict=analysis.verdict,
+async def insert_comment(s: AsyncSession, ws: str, post_id: int, author: str, body: str, analysis) -> dict:
+    comment = Comment(workspace=ws, post_id=post_id, author=author, body=body, verdict=analysis.verdict,
                       risk=analysis.risk, analysis=analysis.to_dict())
     s.add(comment)
     await s.commit()
     return comment.to_dict()
 
 
-async def react(s: AsyncSession, post_id: int, kind: str) -> dict | None:
+async def react(s: AsyncSession, ws: str, post_id: int, kind: str) -> dict | None:
     column = {"like": Post.likes, "share": Post.shares}[kind]
     result = await s.execute(
-        update(Post).where(Post.id == post_id).values({column: column + 1}).returning(Post.likes, Post.shares)
+        update(Post).where(Post.id == post_id, Post.workspace == ws)
+        .values({column: column + 1}).returning(Post.likes, Post.shares)
     )
     row = result.first()
     await s.commit()
     return {"likes": row.likes, "shares": row.shares} if row else None
 
 
-async def content_counts(s: AsyncSession) -> dict:
+async def delete_post(s: AsyncSession, ws: str, post_id: int) -> str | None:
+    """Delete one post and its comments. Returns its image file name (if any) or None if not found."""
+    post = await find_post(s, ws, post_id)
+    if post is None:
+        return None
+    image = post.image or ""
+    await s.execute(delete(Comment).where(Comment.post_id == post_id))
+    await s.execute(delete(Post).where(Post.id == post_id))
+    await s.commit()
+    return image
+
+
+async def clear_posts(s: AsyncSession, ws: str) -> list[str]:
+    """Delete every post and comment in a workspace. Returns image file names to remove."""
+    images = [i for i in (await s.scalars(select(Post.image).where(Post.workspace == ws))).all() if i]
+    await s.execute(delete(Comment).where(Comment.workspace == ws))
+    await s.execute(delete(Post).where(Post.workspace == ws))
+    await s.commit()
+    return images
+
+
+async def content_counts(s: AsyncSession, ws: str) -> dict:
+    def count(model, *where):
+        return select(func.count()).select_from(model).where(model.workspace == ws, *where).scalar_subquery()
+
     row = (await s.execute(select(
-        select(func.count()).select_from(Post).scalar_subquery().label("posts"),
-        select(func.count()).select_from(Post).where(Post.verdict == "flagged").scalar_subquery()
-        .label("flagged_posts"),
-        select(func.count()).select_from(Comment).scalar_subquery().label("comments"),
-        select(func.count()).select_from(Comment).where(Comment.verdict == "flagged").scalar_subquery()
-        .label("flagged_comments"),
+        count(Post).label("posts"),
+        count(Post, Post.verdict == "flagged").label("flagged_posts"),
+        count(Comment).label("comments"),
+        count(Comment, Comment.verdict == "flagged").label("flagged_comments"),
     ))).one()
     return dict(row._mapping)
+
+
+async def purge_older_than(s: AsyncSession, cutoff: datetime) -> list[str]:
+    """Delete demo rows created before ``cutoff``; returns image file names to remove."""
+    images = [i for i in (await s.scalars(select(Post.image).where(Post.created_at < cutoff))).all() if i]
+    await s.execute(delete(Comment).where(Comment.post_id.in_(select(Post.id).where(Post.created_at < cutoff))))
+    await s.execute(delete(Comment).where(Comment.created_at < cutoff))
+    await s.execute(delete(Post).where(Post.created_at < cutoff))
+    await s.execute(delete(Message).where(Message.created_at < cutoff))
+    await s.commit()
+    return images
 
 
 # --- Stream messages -----------------------------------------------------------------
@@ -225,10 +285,10 @@ async def insert_messages(s: AsyncSession, rows: list[dict]) -> dict[str, int]:
 
 
 async def list_messages(
-    s: AsyncSession, channel: str | None, verdict: str | None, limit: int, before_id: int | None = None,
+    s: AsyncSession, ws: str, channel: str | None, verdict: str | None, limit: int, before_id: int | None = None,
 ) -> list[dict]:
     """Newest first. Pass the smallest id you have as ``before_id`` to page further back."""
-    q = select(Message).order_by(Message.id.desc()).limit(limit)
+    q = select(Message).where(Message.workspace == ws).order_by(Message.id.desc()).limit(limit)
     if channel:
         q = q.where(Message.channel == channel)
     if verdict:
@@ -238,6 +298,14 @@ async def list_messages(
     return [m.to_dict() for m in (await s.scalars(q)).all()]
 
 
-async def delete_messages(s: AsyncSession) -> None:
-    await s.execute(delete(Message))
+async def message_counts(s: AsyncSession, ws: str) -> dict:
+    row = (await s.execute(select(
+        func.count().label("messages"),
+        func.count().filter(Message.verdict == "flagged").label("flagged_messages"),
+    ).where(Message.workspace == ws))).one()
+    return dict(row._mapping)
+
+
+async def delete_messages(s: AsyncSession, ws: str) -> None:
+    await s.execute(delete(Message).where(Message.workspace == ws))
     await s.commit()

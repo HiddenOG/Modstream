@@ -223,6 +223,10 @@ def main() -> None:
     p.add_argument("--procs", type=int, default=1, help="client processes (one Python process tops out ~2-3k msg/s)")
     p.add_argument("--out", help="also write the JSON report here")
     args = p.parse_args()
+    # Every connection joins one named workspace; without cookies each would get its own private
+    # sandbox and subscribers would never see what the publishers sent.
+    if "workspace=" not in args.url:
+        args.url += ("&" if "?" in args.url else "?") + "workspace=loadtest"
 
     n_subs = args.subscribers if args.mode == "pipeline" else 0
     procs = max(1, min(args.procs, args.streams))

@@ -1,3 +1,4 @@
+import asyncio
 import json
 import time
 
@@ -13,6 +14,37 @@ def sse_events(body: str) -> list[tuple[str, str, dict]]:
         if "data" in fields and "event" in fields:
             out.append((fields.get("id"), fields["event"], json.loads(fields["data"])))
     return out
+
+
+class Visitor:
+    """A second browser on the same test client: its own session cookie, so its own workspace.
+    (A second TestClient would run on a different event loop than the app and deadlock.)"""
+
+    def __init__(self, client):
+        self.client, self.cookie = client, None
+
+    def request(self, method, url, **kwargs):
+        jar = self.client.cookies
+        saved = {c.name: c.value for c in jar.jar}
+        jar.clear()
+        if self.cookie:
+            jar.set("session", self.cookie)
+        try:
+            return self.client.request(method, url, **kwargs)
+        finally:
+            self.cookie = jar.get("session") or self.cookie
+            jar.clear()
+            for name, value in saved.items():
+                jar.set(name, value)
+
+    def get(self, url, **kw):
+        return self.request("GET", url, **kw)
+
+    def post(self, url, **kw):
+        return self.request("POST", url, **kw)
+
+    def delete(self, url, **kw):
+        return self.request("DELETE", url, **kw)
 
 
 def wait_for(predicate, timeout=5.0):
@@ -266,3 +298,76 @@ def test_reset_clears_stored_stream_messages_and_reports_feed_progress(client):
     client.post("/api/v1/demo/reset")
     assert client.get("/api/v1/messages").json()["messages"] == []
     assert client.get("/api/v1/stats").json()["feed"] is None
+
+
+# --- Private sandboxes: each visitor only ever sees their own activity ----------------------
+
+def test_visitors_cannot_see_each_others_activity(client):
+    other = Visitor(client)  # a second browser: separate cookie, separate workspace
+    client.post("/api/v1/posts", json={"text": "alice's post"})
+    client.post("/api/v1/analyze", json={"text": "you idiot"})
+    client.post("/api/v1/messages", json={"messages": [{"text": "alice's message"}]})
+    wait_for(lambda: client.get("/api/v1/messages").json()["messages"])
+
+    assert other.get("/api/v1/posts").json()["posts"] == []
+    assert other.get("/api/v1/messages").json()["messages"] == []
+    stats = other.get("/api/v1/stats").json()
+    assert stats["scans"] == 0 and stats["posts"] == 0 and stats["messages"] == 0
+    assert b"alice&#39;s post" not in other.get("/feed").content and b"alice" in client.get("/feed").content
+
+    post_id = client.get("/api/v1/posts").json()["posts"][0]["id"]
+    assert other.delete(f"/api/v1/posts/{post_id}").status_code == 404  # can't touch it either
+    assert other.post(f"/api/v1/posts/{post_id}/comments", json={"text": "hi"}).status_code == 404
+    assert other.post(f"/api/v1/posts/{post_id}/reactions", json={"kind": "like"}).status_code == 404
+
+
+def test_live_stream_only_carries_your_own_events(client):
+    other = Visitor(client)
+    client.post("/api/v1/posts", json={"text": "visible to alice only"})
+    other.post("/api/v1/posts", json={"text": "visible to bob only"})
+    mine = [e[2]["body"] for e in sse_events(client.get("/api/v1/stream").text)]
+    theirs = [e[2]["body"] for e in sse_events(other.get("/api/v1/stream").text)]
+    assert mine == ["visible to alice only"] and theirs == ["visible to bob only"]
+
+
+def test_reset_only_clears_your_own_workspace(client):
+    other = Visitor(client)
+    for c, text in ((client, "alice"), (other, "bob")):
+        c.post("/api/v1/messages", json={"messages": [{"text": text}]})
+        wait_for(lambda c=c: c.get("/api/v1/messages").json()["messages"])
+    client.post("/api/v1/demo/reset")
+    assert client.get("/api/v1/messages").json()["messages"] == []
+    assert [m["body"] for m in other.get("/api/v1/messages").json()["messages"]] == ["bob"]
+    assert other.get("/api/v1/stats").json()["messages"] == 1
+
+
+def test_delete_post_and_clear_feed(client):
+    ids = [client.post("/api/v1/posts", json={"text": f"post {i}"}).json()["id"] for i in range(3)]
+    client.post(f"/api/v1/posts/{ids[0]}/comments", json={"text": "a comment"})
+    assert client.delete(f"/api/v1/posts/{ids[0]}").status_code == 204
+    assert [p["id"] for p in client.get("/api/v1/posts").json()["posts"]] == [ids[2], ids[1]]
+    assert client.delete(f"/api/v1/posts/{ids[0]}").status_code == 404
+    assert client.delete("/api/v1/posts").status_code == 204
+    assert client.get("/api/v1/posts").json()["posts"] == []
+    assert client.get("/api/v1/stats").json()["comments"] == 0
+
+
+def test_one_feed_at_a_time_per_visitor(client):
+    async def slow_source(limit):
+        await asyncio.sleep(5)
+        yield "did:x", "late"
+
+    client.app.state.rt.bluesky_source = slow_source
+    assert client.post("/api/v1/feeds/bluesky", json={"messages": 10}).status_code == 202
+    second = client.post("/api/v1/simulate", json={"messages": 10})
+    assert second.status_code == 409 and "already running" in second.json()["error"]["message"]
+    client.post("/api/v1/demo/reset")  # cancels it, so a new one may start
+    assert client.post("/api/v1/simulate", json={"messages": 10}).status_code == 202
+
+
+def test_explicit_workspace_header_shares_a_sandbox(client):
+    a, b = Visitor(client), Visitor(client)
+    a.post("/api/v1/posts", json={"text": "shared"}, headers={"X-Workspace": "loadtest"})
+    shared = b.get("/api/v1/posts", headers={"X-Workspace": "loadtest"}).json()["posts"]
+    assert [p["body"] for p in shared] == ["shared"]
+    assert b.get("/api/v1/posts").json()["posts"] == []  # without the header: b's own sandbox

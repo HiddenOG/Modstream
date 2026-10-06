@@ -13,6 +13,7 @@ from pydantic import ValidationError
 from . import __version__
 from .schemas import CommentIn, PostIn, ReactionIn
 from .services import Runtime, ServiceError
+from .workspace import WS
 
 router = APIRouter(include_in_schema=False)
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
@@ -57,8 +58,8 @@ def _first_error(exc: ValidationError) -> str:
 
 
 @router.get("/", name="pages.home")
-async def home(request: Request):
-    return render(request, "index.html", stats=await request.app.state.rt.stats())
+async def home(request: Request, ws: WS):
+    return render(request, "index.html", stats=await request.app.state.rt.stats(ws))
 
 
 @router.get("/analyze", name="pages.analyze")
@@ -67,14 +68,15 @@ async def analyze(request: Request):
 
 
 @router.get("/feed", name="pages.feed")
-async def feed(request: Request):
+async def feed(request: Request, ws: WS):
     rt: Runtime = request.app.state.rt
-    return render(request, "feed.html", posts=await rt.list_posts(), stats=await rt.stats())
+    return render(request, "feed.html", posts=await rt.list_posts(ws), stats=await rt.stats(ws))
 
 
 @router.post("/feed", name="pages.create_post")
 async def create_post(
     request: Request,
+    ws: WS,
     text: str = Form(""),
     author: str = Form(""),
     image: UploadFile | None = File(None),
@@ -82,7 +84,7 @@ async def create_post(
     rt: Runtime = request.app.state.rt
     try:
         body = PostIn(author=author, text=text)
-        post = await rt.create_post(body.author, body.text, image)
+        post = await rt.create_post(ws, body.author, body.text, image)
     except ValidationError as exc:
         flash(request, _first_error(exc), "error")
         return back_to_feed()
@@ -95,10 +97,10 @@ async def create_post(
 
 
 @router.post("/feed/{post_id}/comments", name="pages.add_comment")
-async def add_comment(request: Request, post_id: int, comment: str = Form(""), author: str = Form("")):
+async def add_comment(request: Request, ws: WS, post_id: int, comment: str = Form(""), author: str = Form("")):
     try:
         body = CommentIn(author=author, text=comment)
-        await request.app.state.rt.add_comment(post_id, body.author, body.text)
+        await request.app.state.rt.add_comment(ws, post_id, body.author, body.text)
     except ValidationError as exc:
         flash(request, _first_error(exc), "error")
     except ServiceError as exc:
@@ -107,17 +109,34 @@ async def add_comment(request: Request, post_id: int, comment: str = Form(""), a
 
 
 @router.post("/feed/{post_id}/react", name="pages.react")
-async def react(request: Request, post_id: int, kind: str = Form("")):
+async def react(request: Request, ws: WS, post_id: int, kind: str = Form("")):
     try:
-        await request.app.state.rt.react(post_id, ReactionIn(kind=kind).kind)
+        await request.app.state.rt.react(ws, post_id, ReactionIn(kind=kind).kind)
     except (ValidationError, ServiceError):
         flash(request, "Couldn't save that reaction.", "error")
     return back_to_feed(post_id)
 
 
+@router.post("/feed/{post_id}/delete", name="pages.delete_post")
+async def delete_post(request: Request, ws: WS, post_id: int):
+    try:
+        await request.app.state.rt.delete_post(ws, post_id)
+        flash(request, "Post deleted.")
+    except ServiceError as exc:
+        flash(request, exc.message, "error")
+    return back_to_feed()
+
+
+@router.post("/feed/clear", name="pages.clear_feed")
+async def clear_feed(request: Request, ws: WS):
+    await request.app.state.rt.clear_feed(ws)
+    flash(request, "Your feed was cleared.")
+    return back_to_feed()
+
+
 @router.get("/monitor", name="pages.monitor")
-async def monitor(request: Request):
-    return render(request, "monitor.html", stats=await request.app.state.rt.stats())
+async def monitor(request: Request, ws: WS):
+    return render(request, "monitor.html", stats=await request.app.state.rt.stats(ws))
 
 
 @router.get("/chat", name="pages.chat")

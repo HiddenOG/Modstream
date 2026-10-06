@@ -90,27 +90,23 @@ async def test_read_events_blocks_until_published(broker):
     assert got[0][1] == {"hello": "world"}
 
 
-async def test_counters(broker):
-    await broker.incr({"scans": 1, "latency": 2.5})
-    await broker.incr({"scans": 2})
-    counters = await broker.counters()
-    assert counters["scans"] == 3 and counters["latency"] == 2.5
+async def test_counters_are_per_workspace(broker):
+    await broker.incr("alice", {"scans": 1, "latency": 2.5})
+    await broker.incr("alice", {"scans": 2})
+    await broker.incr("bob", {"scans": 10})
+    assert await broker.counters("alice") == {"scans": 3, "latency": 2.5}
+    assert await broker.counters("bob") == {"scans": 10}
+    assert await broker.counters("nobody") == {}
 
 
-async def test_reset_wipes_queue_events_and_counters(broker):
-    await broker.enqueue([{"n": 1}, {"n": 2}])
-    await broker.consume("w1", count=1, block_ms=100)  # one pending, one waiting
-    before = await broker.publish([{"i": 1}])
-    await broker.incr({"scans": 5})
+async def test_reset_workspace_only_touches_that_workspace(broker):
+    await broker.incr("alice", {"scans": 5})
+    await broker.incr("bob", {"scans": 7})
+    assert await broker.generation("alice") == 0
 
-    await broker.reset()
+    await broker.reset_workspace("alice")
 
-    assert await broker.queue_stats() == {"lag": 0, "pending": 0, "dead_lettered": 0}
-    assert await broker.recent_events(10) == []
-    assert await broker.counters() == {}
-    # Still fully usable afterwards, and new event ids keep increasing for live subscribers.
-    await broker.enqueue([{"n": 3}])
-    assert [p["n"] for _, p in await broker.consume("w1", count=10, block_ms=100)] == [3]
-    after = await broker.publish([{"i": 2}])
-    assert [e for _, e in await broker.events_after(before[0], 10)] == [{"i": 2}]
-    assert after[0] != before[0]
+    assert await broker.counters("alice") == {}
+    assert await broker.generation("alice") == 1
+    assert await broker.counters("bob") == {"scans": 7}
+    assert await broker.generation("bob") == 0
