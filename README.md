@@ -1,14 +1,18 @@
 # Modstream
 
+[![Try it live](https://img.shields.io/badge/%E2%96%B6%20Try%20it%20live-modstream--production.up.railway.app-4f46e5?style=for-the-badge)](https://modstream-production.up.railway.app/)
+
 [![CI](https://github.com/HiddenOG/Modstream/actions/workflows/ci.yml/badge.svg)](https://github.com/HiddenOG/Modstream/actions/workflows/ci.yml)
 
 **Automatic content moderation for high-volume message streams.** Harassment, hate speech, threats and violent extremism are flagged in milliseconds, with explainable verdicts.
+
+**[▶ Try the live demo](https://modstream-production.up.railway.app/)**: analyze a message, post in the sandbox feed, or pull 5,000 real Bluesky posts through the live monitor. Every visitor gets a private sandbox.
 
 Modstream scores chats, posts and comments with a hybrid pipeline (a curated rule layer plus a RoBERTa toxicity model used for triage) and turns the result into product actions: pre-send nudges, content-warning interstitials, a human review queue and a live moderator console. The serving layer is built for **thousands of concurrent streams**: async I/O, dynamic micro-batching, Redis Streams worker pools and per-node fan-out.
 
 - **7,772 msg/s** across **2,000 concurrent WebSocket streams** on the rules path, with zero errors and p99 165 ms; about **45 msg/s per process** with the transformer on every message ([load test results](loadtest/RESULTS.md))
 - **At-least-once** stream processing, with idempotent storage, crash recovery and a dead-letter queue
-- **84 tests**, including broker tests against both backends; a CI integration job runs the suite against real Redis 7 and Postgres 16
+- **133 tests**, including broker tests against both backends; a CI integration job runs the suite against real Redis 7 and Postgres 16
 
 ![Live monitor](docs/screenshots/monitor.png)
 
